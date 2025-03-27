@@ -4,6 +4,9 @@
 #include "./Board/board.h"
 #include "nlohmann/json.hpp"
 
+#include "./PixelBuffer/pixelbuffer.h"
+#include "./DrawWorker/drawworker.h"
+
 using json = nlohmann::json;
 
 using namespace std;
@@ -20,6 +23,7 @@ string boardToString(vector<vector<string>> board) {
 }
 
 int main() {
+    PixelBuffer* pb = new PixelBuffer();
     httplib::Server svr;
 
     svr.Get("/", [](const httplib::Request&, httplib::Response& res) {
@@ -60,6 +64,22 @@ int main() {
         }
 
         res.set_content("Pixel x:"+x+" y:"+y+", colour:"+colour+" added!", "text/plain");
+    });
+
+    svr.Post("/drawLine", [&](const httplib::Request& req, httplib::Response& res) {
+        try {
+            json req_json = json::parse(req.body);
+    
+            DrawWorker* worker = new DrawWorker(pb, req_json);
+            worker->start(); 
+            cout << "Drawn!" << endl;
+    
+            res.set_content("Drawn!", "text/plain");
+        } catch (const json::parse_error& e) {
+            cout << "JSON Parse Error: " << e.what() << endl;
+            res.status = 400;  
+            res.set_content("Invalid JSON", "text/plain");
+        }
     });
 
     std::cout << "Server is running on port 8080..." << std::endl;
