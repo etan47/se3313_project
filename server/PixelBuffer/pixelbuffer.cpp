@@ -19,10 +19,11 @@ void PixelBuffer::writePixels(std::vector<Pixel> pixels) {
 }
 
 std::vector<Pixel> PixelBuffer::getBuffer() {
+   
     std::unique_lock<std::mutex> lock(mtx);
 
     not_empty.wait(lock, [&]() { return count > 0; });
-
+    
     std::vector<Pixel> pixels;
     for (int i = 0; i < count; i++) {
         pixels.push_back(buffer[head]);

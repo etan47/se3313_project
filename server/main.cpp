@@ -11,6 +11,20 @@ using json = nlohmann::json;
 
 using namespace std;
 
+void* loopGetBuffer(void* arg) {
+    PixelBuffer* pb = (PixelBuffer*)arg;
+    
+    while (true){
+        vector<Pixel> pixels = pb->getBuffer();
+
+        cout<<pixels.size()<<endl;
+        for (const auto& entry : pixels) {
+            cout<<entry.colour<<endl;
+            addPixel(entry);
+        }
+    }
+}
+
 string boardToString(vector<vector<string>> board) {
     string result;
     for (const auto& row : board) {
@@ -24,6 +38,9 @@ string boardToString(vector<vector<string>> board) {
 
 int main() {
     PixelBuffer* pb = new PixelBuffer();
+
+    pthread_t thread = pthread_create(&thread, NULL, loopGetBuffer, (void*)pb);
+     
     httplib::Server svr;
 
     svr.Get("/", [](const httplib::Request&, httplib::Response& res) {
@@ -31,13 +48,13 @@ int main() {
     });
 
     svr.Get("/getBoard", [](const httplib::Request&, httplib::Response& res) {
-       
+    
         vector<vector<string>> board = getBoard();
         res.set_content(boardToString(board), "text/plain");
     });
 
     svr.Post("/addPixel", [](const httplib::Request& req, httplib::Response& res) {
-       
+    
         string x;
         string y;
         string colour;
@@ -54,7 +71,7 @@ int main() {
                 y = req_json["y"];
             }
             cout<<x<<y<<colour<<endl;
-           
+        
             Pixel p(stoi(x),stoi(y),colour);
             addPixel(p);
         } catch (const json::parse_error& e) {
@@ -86,4 +103,7 @@ int main() {
     svr.listen("0.0.0.0", 8080);
 
     return 0;
+
+  
+    
 }

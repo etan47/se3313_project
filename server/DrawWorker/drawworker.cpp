@@ -6,14 +6,15 @@
 DrawWorker::DrawWorker(PixelBuffer* pb, nlohmann::json req_json) : pixelBuffer(pb), req_json(req_json) {}
 
 void DrawWorker::run() {
+    std::string colour = req_json["colour"];
     for (auto& item : req_json["pixels"]) {
         int x = item["x"];
         int y = item["y"];
-        std::string color = item["color"];
-        pixels.emplace_back(x, y, color);
+        //std::string color = item["color"];
+        pixels.emplace_back(x, y, colour);
 
         // sleep for testing
-        std::cout << "DRAWWORKER: x: " << x << " y: " << y << " color: " << color << std::endl;
+        std::cout << "DRAWWORKER: x: " << x << " y: " << y << " colour: " << colour << std::endl;
         std::this_thread::sleep_for(std::chrono::seconds(2));
     }
 
