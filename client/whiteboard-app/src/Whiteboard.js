@@ -5,8 +5,9 @@ const Whiteboard = () => {
   const canvasRef = useRef(null);
   const contextRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [pixels, setPixels] = useState([]);
-  const [lastPos, setLastPos] = useState(null);
+  const finalPixels = useRef(new Set());
+  const lastPos = useRef(null);
+  const [thickness, setThickness] = useState(5);
 
   // Setup canvas when component mounts
   useEffect(() => {
@@ -19,18 +20,14 @@ const Whiteboard = () => {
 
     const context = canvas.getContext("2d");
     context.scale(2, 2);
-    context.lineCap = "round";
-    context.strokeStyle = "Black";
-    context.lineWidth = 1;
+    context.fillStyle = "Black";
     contextRef.current = context;
   }, []);
 
   // Start drawing on mouse down
   const startDrawing = ({ nativeEvent }) => {
     const { offsetX, offsetY } = nativeEvent;
-    setLastPos({ x: offsetX, y: offsetY });
-    contextRef.current.beginPath();
-    contextRef.current.moveTo(offsetX, offsetY);
+    lastPos.current = { x: offsetX, y: offsetY };
     setIsDrawing(true);
   };
 
@@ -43,7 +40,7 @@ const Whiteboard = () => {
     let err = dx - dy;
 
     while (true) {
-        pixels.push({ x: x0, y: y0 });
+        pixels.push([x0, y0]);
         if (x0 === x1 && y0 === y1) break;
         let e2 = err * 2;
         if (e2 > -dy) {
@@ -61,22 +58,37 @@ const Whiteboard = () => {
 
   // Draw as the mouse moves
   const draw = ({ nativeEvent }) => {
-    if (!isDrawing || !lastPos) return;
+    if (!isDrawing || !lastPos.current) return;
     const { offsetX, offsetY } = nativeEvent;
-    const newPixels = getLinePixels(lastPos.x, lastPos.y, offsetX, offsetY);
-    setPixels((prevPixels) => [...prevPixels, ...newPixels]);
-    contextRef.current.lineTo(offsetX, offsetY);
-    contextRef.current.stroke();
-    setLastPos({ x: offsetX, y: offsetY });
+    const newPixels = getLinePixels(lastPos.current.x, lastPos.current.y, offsetX, offsetY);
+    lastPos.current = { x: offsetX, y: offsetY };
+
+    const half = Math.floor(thickness / 2);
+    newPixels.forEach((p) => {
+      let x = p[0];
+      let y = p[1];
+      contextRef.current.fillRect(x - half, y - half, thickness, thickness);
+      for (let i = x - half; i <= x + half; i++){
+        for (let j = y - half; j <= y + half; j++){
+          const key = `${i},${j}`;
+          if (!finalPixels.current.has(key)){
+            finalPixels.current.add(key);
+          }
+        }
+      }
+    })
   };
 
   // Stop drawing on mouse up or when leaving the canvas
   const finishDrawing = () => {
-    if (pixels.length !== 0){
-      const toSend = {colour: contextRef.current.strokeStyle, pixels: pixels};
+    if (finalPixels.current.size !== 0){
+      const toSend = {colour: contextRef.current.strokeStyle, pixels: [...finalPixels.current].map((p) => {
+        let coords = p.split(",");
+        return {x: parseInt(coords[0]), y: parseInt(coords[1])}
+      })};
       console.log(toSend);
     }
-    setPixels([]);
+    finalPixels.current = new Set();
     contextRef.current.closePath();
     setIsDrawing(false);
   };
@@ -88,7 +100,11 @@ const Whiteboard = () => {
   };
 
   const changeColour = (e) => {
-    contextRef.current.strokeStyle = e.target.textContent;
+    contextRef.current.fillStyle = e.target.textContent;
+  }
+
+  const changeThickness = (e) => {
+    setThickness(e.target.textContent);
   }
 
   return (
@@ -102,13 +118,23 @@ const Whiteboard = () => {
         style={{ border: "1px solid #000" }}
       />
       <br />
+      <p>Set Colour:</p>
       <button onClick={changeColour}>Black</button>
       <button onClick={changeColour}>Red</button>
+      <button onClick={changeColour}>Orange</button>
+      <button onClick={changeColour}>Yellow</button>
       <button onClick={changeColour}>Green</button>
       <button onClick={changeColour}>Blue</button>
-      <button onClick={changeColour}>Yellow</button>
+      <button onClick={changeColour}>Purple</button>
       <button onClick={changeColour}>White</button>
       <button onClick={clearCanvas}>Clear</button>
+      <br />
+      <p>Set Thickness:</p>
+      <button onClick={changeThickness}>1</button>
+      <button onClick={changeThickness}>4</button>
+      <button onClick={changeThickness}>10</button>
+      <button onClick={changeThickness}>20</button>
+      <button onClick={changeThickness}>60</button>
     </div>
   );
 };
