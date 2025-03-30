@@ -3,26 +3,36 @@
 #include <chrono>
 #include <thread>
 
-DrawWorker::DrawWorker(PixelBuffer* pb, nlohmann::json req_json) : pixelBuffer(pb), req_json(req_json) {}
+using namespace std;
 
-void DrawWorker::run() {
-    string colour = req_json["colour"];
-    for (auto& item : req_json["pixels"]) {
+DrawWorker::DrawWorker(PixelBuffer *pb, nlohmann::json req_json) : pixelBuffer(pb), req_json(req_json) {}
+
+void DrawWorker::run()
+{
+    // string colour = req_json["colour"];
+    int colour = req_json["colour"];
+    for (auto &item : req_json["pixels"])
+    {
         int x = item["x"];
         int y = item["y"];
+        // string color = item["color"];
         pixels.emplace_back(x, y, colour);
 
         // sleep for testing
-        std::cout << "DRAWWORKER: x: " << x << " y: " << y << " colour: " << colour << std::endl;
-        std::this_thread::sleep_for(std::chrono::seconds(2));
+        // cout << "DRAWWORKER: x: " << x << " y: " << y << " colour: " << colour << endl;
+        // this_thread::sleep_for(chrono::seconds(2));
     }
 
-    if (!pixels.empty()) {
+    if (!pixels.empty())
+    {
         pixelBuffer->writePixels(pixels);
+        cout << "Added " << pixels.size() << " pixels to buffer." << endl;
+        cout << "Colour: " << colour << endl;
     }
 }
 
-void DrawWorker::start() {
-    workerThread = std::thread(&DrawWorker::run, this);
+void DrawWorker::start()
+{
+    workerThread = thread(&DrawWorker::run, this);
     workerThread.detach();
 }

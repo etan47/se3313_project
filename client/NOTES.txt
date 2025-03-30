@@ -1,0 +1,1 @@
+When the drawing path goes outside of the canvas, the serer crashes with a segmentation fault

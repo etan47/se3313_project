@@ -6,9 +6,10 @@
 #include <condition_variable>
 #include "../Board/pixel.h"
 
-class PixelBuffer {
+class PixelBuffer
+{
 private:
-    const int BUFFER_SIZE = 100;
+    const int BUFFER_SIZE = 300 * 300; // 90,000 pixels
     std::vector<Pixel> buffer;
     int head, tail, count;
     std::mutex mtx;

@@ -1,4 +1,4 @@
-#ifndef BOARD_H 
+#ifndef BOARD_H
 #define BOARD_H
 
 #include <vector>
@@ -7,7 +7,8 @@
 
 using namespace std;
 
-vector<vector<string>> getBoard();
+// vector<vector<string>> getBoard();
+vector<vector<int>> getBoard();
 void addPixel(Pixel p);
 
-#endif 
+#endif
