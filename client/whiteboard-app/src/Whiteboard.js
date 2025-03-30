@@ -12,6 +12,8 @@ const Whiteboard = () => {
   const finalPixels = useRef(new Set());
   const lastPos = useRef(null);
   const [thickness, setThickness] = useState(5);
+  const previousPixels = useRef(new Set());
+  const previousPixelsTimeout = useRef(null);
 
   const fetchUpdatedCanvas = useCallback(() => {
     openConnection
@@ -47,7 +49,7 @@ const Whiteboard = () => {
 
     const intervalId = setInterval(() => {
       fetchUpdatedCanvas();
-    }, 250);
+    }, 250); // This feels like a lot, but it is necessary to get the pixels from the server.
 
     return () => clearInterval(intervalId);
   }, [fetchUpdatedCanvas]);
@@ -133,6 +135,18 @@ const Whiteboard = () => {
         console.log("Canvas updated:", response.data);
       });
     }
+    // Store a copy of finalPixels before clearing
+    previousPixels.current = new Set(finalPixels.current);
+
+    // Set a timeout to clear the previousPixels after 500ms
+    if (previousPixelsTimeout.current) {
+      clearTimeout(previousPixelsTimeout.current);
+    }
+    previousPixelsTimeout.current = setTimeout(() => {
+      previousPixels.current.clear();
+      previousPixelsTimeout.current = null;
+    }, 500);
+
     finalPixels.current = new Set();
     contextRef.current.closePath();
     setIsDrawing(false);
@@ -151,31 +165,6 @@ const Whiteboard = () => {
   const changeThickness = (e) => {
     setThickness(e.target.textContent);
   };
-
-  // function drawPixels(pixels) {
-  //   const ctx = canvasRef.current.getContext("2d");
-  //   const imageData = ctx.createImageData(cWidth, cHeight);
-  //   const data = imageData.data;
-
-  //   if (pixels.length !== cWidth * cHeight) {
-  //     console.error("Pixel array length does not match canvas dimensions.");
-  //     return;
-  //   }
-
-  //   for (let i = 0; i < pixels.length; i++) {
-  //     const pixel = pixels[i];
-
-  //     // Calculate the index in the imageData.data array
-  //     const dataIndex = i * 4;
-
-  //     // Set RGBA values
-  //     data[dataIndex] = pixel.r; // Red
-  //     data[dataIndex + 1] = pixel.g; // Green
-  //     data[dataIndex + 2] = pixel.b; // Blue
-  //     data[dataIndex + 3] = pixel.a; // Alpha
-  //   }
-  //   ctx.putImageData(imageData, 0, 0);
-  // }
 
   function drawPixels(pixels) {
     const ctx = canvasRef.current.getContext("2d");
@@ -198,7 +187,12 @@ const Whiteboard = () => {
     }
 
     // Update pixels drawn by the user
-    finalPixels.current.forEach((pixelKey) => {
+    const pixelsToDraw = new Set([
+      ...finalPixels.current,
+      ...previousPixels.current,
+    ]);
+
+    pixelsToDraw.forEach((pixelKey) => {
       const [x, y] = pixelKey.split(",").map(Number);
       if (x >= 0 && x < cWidth && y >= 0 && y < cHeight) {
         const colour = convertHextoRGBA(contextRef.current.fillStyle);

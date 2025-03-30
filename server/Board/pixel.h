@@ -8,11 +8,8 @@ using namespace std;
 class Pixel
 {
 public:
-    int x, y;
-    // string colour;
-    int colour;
+    int x, y, colour;
 
-    // Pixel(int x, int y, string colour);
     Pixel(int x, int y, int colour);
 };
 

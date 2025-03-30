@@ -5,8 +5,6 @@ PixelBuffer::PixelBuffer() : head(0), tail(0), count(0), buffer(BUFFER_SIZE, Pix
 
 void PixelBuffer::writePixels(std::vector<Pixel> pixels)
 {
-    // cout << pixels.size() << endl;
-    // cout << BUFFER_SIZE << endl;
 
     std::unique_lock<std::mutex> lock(mtx);
 
@@ -18,7 +16,6 @@ void PixelBuffer::writePixels(std::vector<Pixel> pixels)
         buffer[tail] = p;
         tail = (tail + 1) % BUFFER_SIZE;
         count++;
-        // std::cout << "PIXELBUFFER: Added pixel to buffer: " << p.colour << std::endl;
     }
 
     not_empty.notify_all();

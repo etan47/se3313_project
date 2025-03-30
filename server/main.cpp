@@ -29,7 +29,6 @@ void *loopGetBuffer(void *arg)
     }
 }
 
-// string boardToString(vector<vector<string>> board)
 string boardToString(vector<vector<int>> board)
 {
     string result;
@@ -58,17 +57,15 @@ int main()
     svr.Get("/getBoard", [](const httplib::Request &, httplib::Response &res)
             {
                 vector<vector<int>> board = getBoard();
-                
-                vector<vector<int>> transposed(board[0].size(), vector<int>(board.size()));
 
+                //TODO temporary transpose, we want this function to be quick, problem should be addressed elsewhere
+                vector<vector<int>> transposed(board[0].size(), vector<int>(board.size()));
                 for (size_t i = 0; i < 300; ++i) {
                     for (size_t j = 0; j < 300; ++j) {
                       transposed[j][i] = board[i][j];
                     }
                   }
                 
-
-                // json board_json = board;
                 json board_json = transposed;
                 res.set_header("Content-Type", "application/json");
                 res.set_content(board_json.dump(), "application/json"); });
@@ -110,7 +107,6 @@ int main()
     
             DrawWorker* worker = new DrawWorker(pb, req_json);
             worker->start(); 
-            // cout << "Drawn!" << endl;
     
             res.set_content("Drawn!", "text/plain");
         } catch (const json::parse_error& e) {
