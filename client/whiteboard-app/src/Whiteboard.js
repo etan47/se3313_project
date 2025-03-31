@@ -111,6 +111,9 @@ const Whiteboard = () => {
       for (let i = x - half; i <= x + half; i++) {
         for (let j = y - half; j <= y + half; j++) {
           const key = `${i},${j}`;
+          if (i < 0 || i > cWidth || j < 0 || j > cHeight){
+            continue;
+          }
           if (!finalPixels.current.has(key)) {
             finalPixels.current.add(key);
           }
