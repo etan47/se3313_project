@@ -19,3 +19,7 @@ void addPixel(Pixel p)
     board[p.x][p.y] = p.colour;
     // cout << "Added pixel to board: " << p.colour << endl;
 }
+
+void clearBoard(){
+    board.assign(300, std::vector<int>(300, 7));
+}
