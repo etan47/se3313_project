@@ -23,7 +23,7 @@ const Whiteboard = () => {
         let pixels = [];
         for (let i = 0; i < response.data.length; i++) {
           for (let j = 0; j < response.data[i].length; j++) {
-            pixels.push(convertIntToRGBA(response.data[i][j]));
+            pixels.push(convertIntToRGBA(response.data[j][i]));
           }
         }
         drawPixels(pixels);
@@ -111,6 +111,9 @@ const Whiteboard = () => {
       for (let i = x - half; i <= x + half; i++) {
         for (let j = y - half; j <= y + half; j++) {
           const key = `${i},${j}`;
+          if (i < 0 || i > cWidth - 1 || j < 0 || j > cHeight - 1) {
+            continue;
+          }
           if (!finalPixels.current.has(key)) {
             finalPixels.current.add(key);
           }
@@ -156,6 +159,9 @@ const Whiteboard = () => {
   const clearCanvas = () => {
     const canvas = canvasRef.current;
     contextRef.current.clearRect(0, 0, canvas.width, canvas.height);
+    openConnection.put("/clear").then((res) => {
+      console.log("Canvas cleared:", res.data);
+    })
   };
 
   const changeColour = (e) => {

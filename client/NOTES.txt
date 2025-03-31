@@ -1,7 +1,3 @@
-When the drawing path goes outside of the canvas, the serer crashes with a segmentation fault
-
-The clear doesn't update the backend
-
 Frontend and backend canvas size need to match, should connect these programmatically
 
 Don't love how many canvas update requests we are sending to the backend, but it's necessary, maybe we could minimize the impact by using serverside result caching

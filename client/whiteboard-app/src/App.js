@@ -1,34 +1,34 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import "./App.css"
-import Whiteboard from "./Whiteboard"
-import Login from "./Login"
-import SignUp from "./SignUp"
-import NavBar from "./NavBar"
+import { useState } from "react";
+import "./App.css";
+import Whiteboard from "./Whiteboard";
+import Login from "./Login";
+import SignUp from "./SignUp";
+import NavBar from "./NavBar";
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [username, setUsername] = useState("")
-  const [showSignUp, setShowSignUp] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [username, setUsername] = useState("");
+  const [showSignUp, setShowSignUp] = useState(false);
 
   const handleLoginSuccess = (loggedInUsername) => {
-    setUsername(loggedInUsername)
-    setIsLoggedIn(true)
-  }
+    setUsername(loggedInUsername);
+    setIsLoggedIn(true);
+  };
 
   const handleLogout = () => {
-    setIsLoggedIn(false)
-    setUsername("")
-  }
+    setIsLoggedIn(false);
+    setUsername("");
+  };
 
   const navigateToSignUp = () => {
-    setShowSignUp(true)
-  }
+    setShowSignUp(true);
+  };
 
   const navigateToLogin = () => {
-    setShowSignUp(false)
-  }
+    setShowSignUp(false);
+  };
 
   return (
     <div className="App">
@@ -43,11 +43,13 @@ function App() {
       ) : showSignUp ? (
         <SignUp onNavigateToLogin={navigateToLogin} />
       ) : (
-        <Login onLoginSuccess={handleLoginSuccess} onNavigateToSignUp={navigateToSignUp} />
+        <Login
+          onLoginSuccess={handleLoginSuccess}
+          onNavigateToSignUp={navigateToSignUp}
+        />
       )}
     </div>
-  )
+  );
 }
 
-export default App
-
+export default App;
