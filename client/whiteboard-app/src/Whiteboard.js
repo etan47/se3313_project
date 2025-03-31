@@ -23,7 +23,7 @@ const Whiteboard = () => {
         let pixels = [];
         for (let i = 0; i < response.data.length; i++) {
           for (let j = 0; j < response.data[i].length; j++) {
-            pixels.push(convertIntToRGBA(response.data[i][j]));
+            pixels.push(convertIntToRGBA(response.data[j][i]));
           }
         }
         drawPixels(pixels);
