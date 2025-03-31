@@ -160,6 +160,60 @@ int main()
             res.set_content("Invalid JSON", "text/plain");
         }});
 
+    svr.Post("/register", [&](const httplib::Request &req, httplib::Response &res){
+    
+        string email;
+        string username;
+        string password;
+    
+        try{
+            json req_json = json::parse(req.body);
+            cout << req_json << endl;
+        
+            if (req_json.contains("email") && req_json["email"].is_string()) {
+            email = req_json["email"];
+            }
+        
+            if (req_json.contains("username") && req_json["username"].is_string()) {
+            username = req_json["username"];
+            }
+
+            if (req_json.contains("password") && req_json["password"].is_string()) {
+            password = req_json["password"];
+            }
+        
+        cout << email << username << password << endl;
+        
+        // Check if all components have been filled up (Fix this...)
+        if (!(email && username && password)){
+            res.status = 408;
+            res.set_content("Please fill in all parts!", "text/plain");
+        }
+
+        // Check if the email already exists in the users list
+        for (const auto &entry : users) {
+            if (entry.email == email) {
+                // If the email already exists, return a message that account already exists
+                res.status = 409; // Conflict status code
+                res.set_content(email + " account already exists!", "text/plain");
+                return;
+            }
+        }
+
+        // If the email doesn't exist, create a new user
+        // User new_user(email, username, password);
+        // users.push_back(new_user);
+        
+        // Return success message...
+        res.status = 201; // Created status code
+        res.set_content(email + " created account!", "text/plain");
+        
+    } catch (const json::parse_error& e) {
+        cout << "JSON Parse Error: " << e.what() << endl;
+        res.status = 400;  
+        res.set_content("Invalid JSON", "text/plain");
+    }});
+
     std::cout << "Server is running on port 8080..." << std::endl;
     svr.listen("0.0.0.0", 8080);
 

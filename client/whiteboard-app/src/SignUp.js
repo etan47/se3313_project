@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import "./SignUp.css"
+import "./Auth/serverConnection.js"
 
 const SignUp = ({ onNavigateToLogin }) => {
   const [username, setUsername] = useState("")
@@ -40,6 +41,7 @@ const SignUp = ({ onNavigateToLogin }) => {
 
     // Create new account
     const newAccount = { username, password }
+    
     const updatedAccounts = [...accounts, newAccount]
 
     // Save to localStorage (simulating file storage)
