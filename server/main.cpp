@@ -126,6 +126,13 @@ int main()
             res.set_content("Invalid JSON", "text/plain");
         } });
 
+    svr.Put("/clear", [&](const httplib::Request &req, httplib::Response &res){
+        clearBoard();
+        res.status=200;
+        res.set_content("Board Cleared!", "text/plain");
+        return;
+    });
+
     svr.Post("/login", [&](const httplib::Request &req, httplib::Response &res){
         
 

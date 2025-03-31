@@ -159,6 +159,9 @@ const Whiteboard = () => {
   const clearCanvas = () => {
     const canvas = canvasRef.current;
     contextRef.current.clearRect(0, 0, canvas.width, canvas.height);
+    openConnection.put("/clear").then((res) => {
+      console.log("Canvas cleared:", res.data);
+    })
   };
 
   const changeColour = (e) => {

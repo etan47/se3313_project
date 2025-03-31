@@ -9,5 +9,6 @@ using namespace std;
 
 vector<vector<int>> getBoard();
 void addPixel(Pixel p);
+void clearBoard();
 
 #endif
