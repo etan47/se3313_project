@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "./Board/board.h"
+#include "./User/user.h"
 #include "nlohmann/json.hpp"
 
 #include "./PixelBuffer/pixelbuffer.h"
@@ -13,6 +14,8 @@ using namespace std;
 
 void *loopGetBuffer(void *arg)
 {
+   
+
     PixelBuffer *pb = (PixelBuffer *)arg;
 
     while (true)
@@ -45,6 +48,14 @@ string boardToString(vector<vector<int>> board)
 
 int main()
 {
+
+    User admin("admin@test.com","admin");
+    User bob("bob@test.com","bob");
+
+    vector<User> users;
+    users.push_back(admin);
+    users.push_back(bob);
+
     PixelBuffer *pb = new PixelBuffer();
 
     pthread_t thread = pthread_create(&thread, NULL, loopGetBuffer, (void *)pb);
@@ -114,6 +125,40 @@ int main()
             res.status = 400;  
             res.set_content("Invalid JSON", "text/plain");
         } });
+
+    svr.Post("/login", [&](const httplib::Request &req, httplib::Response &res){
+        
+
+        string email;
+        string password;
+        
+        try{
+            json req_json = json::parse(req.body);
+            cout<<req_json<<endl;
+            if (req_json.contains("email")&& req_json["email"].is_string()) {
+                email = req_json["email"];
+            }
+            if (req_json.contains("password")&& req_json["password"].is_string()) {
+                password = req_json["password"];
+            }
+            cout<<email<<password<<endl;
+            for (const auto &entry : users){
+                if (entry.email ==email && entry.password==password){
+                    res.status=200;
+                    res.set_content(email+" logged in!", "text/plain");
+                    return;
+                    
+                }
+            }
+            res.set_content("Incorrect Email or Password", "text/plain");
+            res.status=401;
+
+            
+        } catch (const json::parse_error& e) {
+            cout << "JSON Parse Error: " << e.what() << endl;
+            res.status = 400;  
+            res.set_content("Invalid JSON", "text/plain");
+        }});
 
     std::cout << "Server is running on port 8080..." << std::endl;
     svr.listen("0.0.0.0", 8080);
