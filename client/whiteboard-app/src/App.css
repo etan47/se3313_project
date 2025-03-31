@@ -36,3 +36,15 @@
     transform: rotate(360deg);
   }
 }
+
+/* Added styles for whiteboard container */
+.whiteboard-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.whiteboard-content {
+  margin-top: 10vh; /* Add margin to account for navbar height */
+  padding: 20px;
+}
