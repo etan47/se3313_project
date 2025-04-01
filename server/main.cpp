@@ -1,3 +1,12 @@
+//mongodb includes
+
+#include <mongocxx/client.hpp>
+#include <mongocxx/instance.hpp>
+#include <mongocxx/uri.hpp>
+#include <bsoncxx/json.hpp>
+#include <bsoncxx/builder/stream/document.hpp>
+#include <bsoncxx/builder/stream/array.hpp>
+
 #include "httplib.h"
 #include <iostream>
 
@@ -12,14 +21,22 @@ using json = nlohmann::json;
 
 using namespace std;
 
+// Create an instance.
+mongocxx::instance inst{};
+mongocxx::client client{mongocxx::uri{"mongodb+srv://dluth:znO1uwIhT8cJnwj4@whiteboarddb.gnq82qm.mongodb.net/?retryWrites=true&w=majority&appName=WhiteBoardDB"}};
+
+mongocxx::database db = client["whiteboard"];
+mongocxx::collection board_collection = db["board"];
+mongocxx::collection user_collection = db["user"];
+
 void *loopGetBuffer(void *arg)
 {
-   
+    
 
     PixelBuffer *pb = (PixelBuffer *)arg;
-
     while (true)
     {
+
         vector<Pixel> pixels = pb->getBuffer();
         cout << "Removed " << pixels.size() << " pixels from buffer." << endl;
 
@@ -29,7 +46,42 @@ void *loopGetBuffer(void *arg)
             // cout << entry.colour << endl;
             addPixel(entry);
         }
+
+        vector<vector<int>> board = getBoard();
+
+        // Convert matrix to BSON
+    
+        bsoncxx::builder::stream::document document{};
+        bsoncxx::builder::stream::array matrix_array{};
+
+        for (const auto& row : board) {
+            bsoncxx::builder::stream::array row_array{};
+            for (const auto& value : row) {
+                
+                row_array << value;
+            }
+            matrix_array << row_array;
+        }
+
+        document << "matrix" << matrix_array;
+
+        // Insert into MongoDB
+        
+        board_collection.update_one(
+            bsoncxx::builder::stream::document{} 
+                << "_id" << bsoncxx::oid("67eb041d28dd4abe4c000efb") 
+                << bsoncxx::builder::stream::finalize,  // Filter
+            bsoncxx::builder::stream::document{} 
+                << "$set" << document.view() 
+                << bsoncxx::builder::stream::finalize,  // Update
+            mongocxx::options::update{}.upsert(true) // Create if not found
+        );
+
+        std::cout << "Matrix inserted into MongoDB!" << std::endl;
+        
     }
+    
+
 }
 
 string boardToString(vector<vector<int>> board)
@@ -46,8 +98,22 @@ string boardToString(vector<vector<int>> board)
     return result;
 }
 
+
 int main()
 {
+    try
+    {
+      // Ping the database.
+      const auto ping_cmd = bsoncxx::builder::basic::make_document(bsoncxx::builder::basic::kvp("ping", 1));
+      db.run_command(ping_cmd.view());
+      std::cout << "Pinged your deployment. You successfully connected to MongoDB!" << std::endl;
+
+    }
+    catch (const std::exception& e)
+    {
+      // Handle errors
+      std::cout<< "Exception: " << e.what() << std::endl;
+    }
 
     User admin("admin@test.com","admin");
     User bob("bob@test.com","bob");
@@ -67,7 +133,13 @@ int main()
 
     svr.Get("/getBoard", [](const httplib::Request &, httplib::Response &res)
             {
-                vector<vector<int>> board = getBoard();
+                //vector<vector<int>> board = getBoard();
+
+                bsoncxx::oid object_id("67eb041d28dd4abe4c000efb");  
+                bsoncxx::builder::stream::document filter_builder;
+                filter_builder << "_id" << object_id;
+            
+                auto board = board_collection.find_one(filter_builder.view());
 
                 //TODO temporary transpose, we want this function to be quick, problem should be addressed elsewhere
                 vector<vector<int>> transposed(board[0].size(), vector<int>(board.size()));
@@ -75,7 +147,7 @@ int main()
                     for (size_t j = 0; j < 300; ++j) {
                       transposed[j][i] = board[i][j];
                     }
-                  }
+                }
                 
                 json board_json = transposed;
                 res.set_header("Content-Type", "application/json");
@@ -111,8 +183,7 @@ int main()
                  // res.set_content("Pixel x:"+x+" y:"+y+", colour:"+colour+" added!", "text/plain");
              });
 
-    svr.Post("/drawLine", [&](const httplib::Request &req, httplib::Response &res)
-             {
+    svr.Post("/drawLine", [&](const httplib::Request &req, httplib::Response &res){
         try {
             json req_json = json::parse(req.body);
     
