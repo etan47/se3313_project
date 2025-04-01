@@ -4,8 +4,8 @@ import { colourHexInt, convertIntToRGBA, convertHextoRGBA } from "./utils";
 import { openConnection } from "./Auth/serverConnection";
 
 const Whiteboard = () => {
-  const cWidth = 300;
-  const cHeight = 300;
+  const cWidth = 600;
+  const cHeight = 600;
   const canvasRef = useRef(null);
   const contextRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -161,7 +161,7 @@ const Whiteboard = () => {
     contextRef.current.clearRect(0, 0, canvas.width, canvas.height);
     openConnection.put("/clear").then((res) => {
       console.log("Canvas cleared:", res.data);
-    })
+    });
   };
 
   const changeColour = (e) => {

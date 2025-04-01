@@ -128,7 +128,8 @@ int main()
             res.set_content("Invalid JSON", "text/plain");
         } });
 
-    svr.Post("/register", [&](const httplib::Request &req, httplib::Response &res){
+    svr.Post("/register", [&](const httplib::Request &req, httplib::Response &res)
+             {
     
         string email;
         string username;
@@ -151,11 +152,12 @@ int main()
             }
         
         cout << email << username << password << endl;
-        
+    
         // Check if all components have been filled up (Fix this...)
-        if (!(email && username && password)){
-            res.status = 408;
+        if (email.empty() || username.empty() || password.empty()){
+            res.status = 400; // Bad request status code
             res.set_content("Please fill in all parts!", "text/plain");
+            return;
         }
 
         // Check if the email already exists in the users list
@@ -180,7 +182,7 @@ int main()
         cout << "JSON Parse Error: " << e.what() << endl;
         res.status = 400;  
         res.set_content("Invalid JSON", "text/plain");
-    }});
+    } });
 
     std::cout << "Server is running on port 8080..." << std::endl;
     svr.listen("0.0.0.0", 8080);
