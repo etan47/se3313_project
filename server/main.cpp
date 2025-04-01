@@ -29,24 +29,11 @@ mongocxx::database db = client["whiteboard"];
 mongocxx::collection board_collection = db["board"];
 mongocxx::collection user_collection = db["user"];
 
-void *loopGetBuffer(void *arg)
-{
-    
 
-    PixelBuffer *pb = (PixelBuffer *)arg;
-    while (true)
-    {
+void *loopUpdateDB(void *arg){
 
-        vector<Pixel> pixels = pb->getBuffer();
-        cout << "Removed " << pixels.size() << " pixels from buffer." << endl;
-
-        // cout << pixels.size() << endl;
-        for (const auto &entry : pixels)
-        {
-            // cout << entry.colour << endl;
-            addPixel(entry);
-        }
-
+    while (true){
+        sleep(1); //update db every set amount of time
         vector<vector<int>> board = getBoard();
 
         // Convert matrix to BSON
@@ -70,18 +57,35 @@ void *loopGetBuffer(void *arg)
         board_collection.update_one(
             bsoncxx::builder::stream::document{} 
                 << "_id" << bsoncxx::oid("67eb041d28dd4abe4c000efb") 
-                << bsoncxx::builder::stream::finalize,  // Filter
+                << bsoncxx::builder::stream::finalize,  // filter by id
             bsoncxx::builder::stream::document{} 
                 << "$set" << document.view() 
-                << bsoncxx::builder::stream::finalize,  // Update
+                << bsoncxx::builder::stream::finalize,  // update db entry
             mongocxx::options::update{}.upsert(true) // Create if not found
         );
 
         std::cout << "Matrix inserted into MongoDB!" << std::endl;
-        
-    }
-    
 
+    }
+   
+        
+}
+
+void *loopGetBuffer(void *arg)
+{
+    PixelBuffer *pb = (PixelBuffer *)arg;
+    while (true)
+    {
+        vector<Pixel> pixels = pb->getBuffer();
+        cout << "Removed " << pixels.size() << " pixels from buffer." << endl;
+
+        // cout << pixels.size() << endl;
+        for (const auto &entry : pixels)
+        {
+            // cout << entry.colour << endl;
+            addPixel(entry);
+        } 
+    }
 }
 
 string boardToString(vector<vector<int>> board)
@@ -126,32 +130,47 @@ int main()
 
     pthread_t thread = pthread_create(&thread, NULL, loopGetBuffer, (void *)pb);
 
+    pthread_t updateDB = pthread_create(&thread, NULL, loopUpdateDB, (void *)pb);
+
+
     httplib::Server svr;
 
     svr.Get("/", [](const httplib::Request &, httplib::Response &res)
             { res.set_content("Hello from cpp-httplib!", "text/plain"); });
 
     svr.Get("/getBoard", [](const httplib::Request &, httplib::Response &res)
-            {
-                //vector<vector<int>> board = getBoard();
+    {
+        vector<vector<int>> board = getBoard();
 
-                bsoncxx::oid object_id("67eb041d28dd4abe4c000efb");  
-                bsoncxx::builder::stream::document filter_builder;
-                filter_builder << "_id" << object_id;
-            
-                auto board = board_collection.find_one(filter_builder.view());
+        //TODO temporary transpose, we want this function to be quick, problem should be addressed elsewhere
+        vector<vector<int>> transposed(board[0].size(), vector<int>(board.size()));
+        for (size_t i = 0; i < 300; ++i) {
+            for (size_t j = 0; j < 300; ++j) {
+                transposed[j][i] = board[i][j];
+            }
+        }
+        
+        json board_json = transposed;
+        res.set_header("Content-Type", "application/json");
+        res.set_content(board_json.dump(), "application/json"); 
+    });
 
-                //TODO temporary transpose, we want this function to be quick, problem should be addressed elsewhere
-                vector<vector<int>> transposed(board[0].size(), vector<int>(board.size()));
-                for (size_t i = 0; i < 300; ++i) {
-                    for (size_t j = 0; j < 300; ++j) {
-                      transposed[j][i] = board[i][j];
-                    }
-                }
-                
-                json board_json = transposed;
-                res.set_header("Content-Type", "application/json");
-                res.set_content(board_json.dump(), "application/json"); });
+    svr.Get("/getBoardFromDB", [](const httplib::Request &, httplib::Response &res)
+    {
+        bsoncxx::oid object_id("67eb041d28dd4abe4c000efb");  //hardcoded id
+        bsoncxx::builder::stream::document filter_builder;
+        filter_builder << "_id" << object_id;
+    
+        auto board = board_collection.find_one(filter_builder.view());
+
+        string json_str = bsoncxx::to_json(board->view()); // Convert BSON to JSON string
+        nlohmann::json board_json = nlohmann::json::parse(json_str); //parse json
+       
+
+        res.set_header("Content-Type", "application/json");
+        res.set_content(board_json.dump(), "application/json"); 
+    });
+
 
     svr.Post("/addPixel", [](const httplib::Request &req, httplib::Response &res)
              {
