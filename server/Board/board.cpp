@@ -5,7 +5,7 @@
 
 using namespace std;
 
-vector<vector<int>> board(600, vector<int>(900, 7)); // 600 x 600 board with all white
+vector<vector<int>> board(600, vector<int>(900, 7)); // 900 x 600 board with all white
 
 // string value is the colour. x and y are just in the indicies
 
@@ -16,9 +16,7 @@ vector<vector<int>> getBoard()
 
 void addPixel(Pixel p)
 {
-    // board[p.x][p.y] = p.colour;
     board[p.y][p.x] = p.colour;
-    // cout << "Added pixel to board: " << p.colour << endl;
 }
 
 void clearBoard()
