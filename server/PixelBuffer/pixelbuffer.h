@@ -9,7 +9,7 @@
 class PixelBuffer
 {
 private:
-    const int BUFFER_SIZE = 600 * 600; // 540000
+    const int BUFFER_SIZE = 600 * 900; // 540000
     std::vector<Pixel> buffer;
     int head, tail, count;
     std::mutex mtx;

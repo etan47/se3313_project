@@ -4,7 +4,7 @@ import { colourHexInt, convertIntToRGBA, convertHextoRGBA } from "./utils";
 import { openConnection } from "./Auth/serverConnection";
 
 const Whiteboard = () => {
-  const cWidth = 600;
+  const cWidth = 900;
   const cHeight = 600;
   const canvasRef = useRef(null);
   const contextRef = useRef(null);
@@ -23,7 +23,7 @@ const Whiteboard = () => {
         let pixels = [];
         for (let i = 0; i < response.data.length; i++) {
           for (let j = 0; j < response.data[i].length; j++) {
-            pixels.push(convertIntToRGBA(response.data[j][i]));
+            pixels.push(convertIntToRGBA(response.data[i][j]));
           }
         }
         drawPixels(pixels);
@@ -49,7 +49,7 @@ const Whiteboard = () => {
 
     const intervalId = setInterval(() => {
       fetchUpdatedCanvas();
-    }, 250); // This feels like a lot, but it is necessary to get the pixels from the server.
+    }, 1000); // This feels like a lot, but it is necessary to get the pixels from the server.
 
     return () => clearInterval(intervalId);
   }, [fetchUpdatedCanvas]);
@@ -148,7 +148,7 @@ const Whiteboard = () => {
     previousPixelsTimeout.current = setTimeout(() => {
       previousPixels.current.clear();
       previousPixelsTimeout.current = null;
-    }, 500);
+    }, 1000);
 
     finalPixels.current = new Set();
     contextRef.current.closePath();
