@@ -9,6 +9,7 @@
 
 #include "httplib.h"
 #include <iostream>
+#include <fstream>
 
 #include "./Board/board.h"
 #include "./User/user.h"
@@ -21,16 +22,38 @@ using json = nlohmann::json;
 
 using namespace std;
 
+
 // Create an instance.
 mongocxx::instance inst{};
-mongocxx::client client{mongocxx::uri{"mongodb+srv://dluth:znO1uwIhT8cJnwj4@whiteboarddb.gnq82qm.mongodb.net/?retryWrites=true&w=majority&appName=WhiteBoardDB"}};
 
-mongocxx::database db = client["whiteboard"];
-mongocxx::collection board_collection = db["board"];
-mongocxx::collection user_collection = db["user"];
 
+// mongocxx::database db = client["whiteboard"];
+// mongocxx::collection board_collection = db["board"];
+// mongocxx::collection user_collection = db["user"];
+
+
+mongocxx::database db;
+mongocxx::collection board_collection;
+mongocxx::collection user_collection;
+
+    
+string getURI(){
+    //grab URI from .env
+    string URI;
+    ifstream file(".env");
+    getline(file, URI);
+    file.close();
+    return URI;
+
+
+}
 
 void *loopUpdateDB(void *arg){
+
+    string URI = getURI();
+    mongocxx::client client{mongocxx::uri{URI}};
+    db= client["whiteboard"];
+    board_collection= db["board"];
 
     while (true){
         sleep(1); //update db every set amount of time
@@ -105,6 +128,11 @@ string boardToString(vector<vector<int>> board)
 
 int main()
 {
+    string URI = getURI();
+    
+    mongocxx::client client{mongocxx::uri{URI}};
+    db= client["whiteboard"];
+    board_collection= db["board"];
     try
     {
       // Ping the database.
@@ -157,6 +185,8 @@ int main()
 
     svr.Get("/getBoardFromDB", [](const httplib::Request &, httplib::Response &res)
     {
+
+
         bsoncxx::oid object_id("67eb041d28dd4abe4c000efb");  //hardcoded id
         bsoncxx::builder::stream::document filter_builder;
         filter_builder << "_id" << object_id;
