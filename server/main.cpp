@@ -87,7 +87,7 @@ void *loopUpdateDB(void *arg){
             mongocxx::options::update{}.upsert(true) // Create if not found
         );
 
-        std::cout << "Matrix inserted into MongoDB!" << std::endl;
+        cout << "Matrix updated in MongoDB!" <<endl;
 
     }
    
@@ -129,7 +129,7 @@ string boardToString(vector<vector<int>> board)
 int main()
 {
     string URI = getURI();
-    
+    //cout<<URI<<endl;
     mongocxx::client client{mongocxx::uri{URI}};
     db= client["whiteboard"];
     board_collection= db["board"];
@@ -138,13 +138,13 @@ int main()
       // Ping the database.
       const auto ping_cmd = bsoncxx::builder::basic::make_document(bsoncxx::builder::basic::kvp("ping", 1));
       db.run_command(ping_cmd.view());
-      std::cout << "Pinged your deployment. You successfully connected to MongoDB!" << std::endl;
+      cout << "Pinged your deployment. You successfully connected to MongoDB!" <<endl;
 
     }
     catch (const std::exception& e)
     {
       // Handle errors
-      std::cout<< "Exception: " << e.what() << std::endl;
+      cout<< "Exception: " << e.what() << endl;
     }
 
     User admin("admin@test.com","admin");
@@ -200,7 +200,42 @@ int main()
         res.set_header("Content-Type", "application/json");
         res.set_content(board_json.dump(), "application/json"); 
     });
-
+    svr.Post("/closeBoard", [](const httplib::Request &, httplib::Response &res)
+    {
+            vector<vector<int>> board = getBoard();
+    
+            // Convert matrix to BSON
+        
+            bsoncxx::builder::stream::document document{};
+            bsoncxx::builder::stream::array matrix_array{};
+    
+            for (const auto& row : board) {
+                bsoncxx::builder::stream::array row_array{};
+                for (const auto& value : row) {
+                    
+                    row_array << value;
+                }
+                matrix_array << row_array;
+            }
+    
+            document << "matrix" << matrix_array;
+    
+            // Insert into MongoDB
+            
+            board_collection.update_one(
+                bsoncxx::builder::stream::document{} 
+                    << "_id" << bsoncxx::oid("67eb041d28dd4abe4c000efb") 
+                    << bsoncxx::builder::stream::finalize,  // filter by id
+                bsoncxx::builder::stream::document{} 
+                    << "$set" << document.view() 
+                    << bsoncxx::builder::stream::finalize,  // update db entry
+                mongocxx::options::update{}.upsert(true) // Create if not found
+            );
+    
+            cout << "Matrix updated before closing Board in MongoDB!" <<endl;
+            res.set_content("Matrix updated in MongoDB!", "text/plain");
+    
+    });
 
     svr.Post("/addPixel", [](const httplib::Request &req, httplib::Response &res)
              {
