@@ -12,56 +12,6 @@ using json = nlohmann::json;
 
 using namespace std;
 
-//! S testing multiple canvases
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <unistd.h>
-#include <vector>
-#include <map>
-#include <cstring>
-
-#define SOCKET_PATH_PREFIX "/tmp/session_"
-
-map<int, int> session_sockets;
-
-void start_child_process(int session_id)
-{
-    pid_t pid = fork();
-    if (pid == 0)
-    {
-        string socket_path = SOCKET_PATH_PREFIX + to_string(session_id);
-
-        int server_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-        sockaddr_un addr{}; //!  what is this {} notation?
-        addr.sun_family = AF_UNIX;
-        strcpy(addr.sun_path, socket_path.c_str());
-
-        unlink(socket_path.c_str());
-        bind(server_fd, (struct sockaddr *)&addr, sizeof(addr));
-        listen(server_fd, 1); //! 1 connection at a time
-
-        cout << "Session " << session_id << " running at " << socket_path << endl;
-
-        while (true)
-        {
-            int client_fd = accept(server_fd, nullptr, nullptr);
-            if (client_fd < 0)
-                continue;
-
-            char buffer[65536] = {0}; //! what is this notation?
-            read(client_fd, buffer, sizeof(buffer));
-            cout << "[Session " << session_id << "] Received: " << buffer << endl;
-
-            string response = "{\"status\": \"processed\"}";
-            write(client_fd, response.c_str(), response.size());
-
-            close(client_fd);
-        }
-    }
-}
-
-//!! E testing multiple canvases
-
 void *loopGetBuffer(void *arg)
 {
 
@@ -93,6 +43,107 @@ string boardToString(vector<vector<int>> board)
     return result;
 }
 
+//! S testing multiple canvases
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
+#include <vector>
+#include <map>
+#include <cstring>
+
+#define SOCKET_PATH_PREFIX "/tmp/session_"
+
+map<int, int> session_sockets;
+
+void start_child_process(int session_id)
+{
+    pid_t pid = fork();
+    if (pid == 0)
+    {
+        string socket_path = SOCKET_PATH_PREFIX + to_string(session_id);
+
+        int server_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+        sockaddr_un addr{}; //!  what is this {} notation?
+        addr.sun_family = AF_UNIX;
+        strcpy(addr.sun_path, socket_path.c_str());
+
+        unlink(socket_path.c_str());
+        bind(server_fd, (struct sockaddr *)&addr, sizeof(addr));
+        listen(server_fd, 128);
+
+        cout << "Session " << session_id << " running at " << socket_path << endl;
+
+        PixelBuffer *pb = new PixelBuffer();
+
+        pthread_t thread = pthread_create(&thread, NULL, loopGetBuffer, (void *)pb);
+
+        while (true)
+        {
+            int client_fd = accept(server_fd, nullptr, nullptr);
+            if (client_fd < 0)
+                continue;
+
+            uint64_t net_size;
+            read(client_fd, &net_size, sizeof(net_size)); // Read the size first
+            net_size = ntohl(net_size);                   // Convert from network byte order to host byte order
+
+            string full_request;
+            full_request.resize(net_size); // Resize the string to hold the incoming data
+            ssize_t bytes_read = 0;
+
+            while (bytes_read < net_size)
+            {
+                ssize_t r = read(client_fd, &full_request[bytes_read], net_size - bytes_read);
+                if (r > 0)
+                {
+                    bytes_read += r;
+                }
+            }
+
+            json received_json = json::parse(full_request);
+
+            int function = received_json["function"];
+
+            string response;
+
+            switch (function)
+            {
+            case 0:
+            {
+                cout << "Drawing..." << endl;
+                DrawWorker *worker = new DrawWorker(pb, received_json);
+                worker->start();
+                response = "{\"status\": \"drawing\"}";
+                break;
+            }
+            case 1:
+            {
+                cout << "Getting board..." << endl;
+                vector<vector<int>> board = getBoard();
+                json board_json = board;
+                response = board_json.dump();
+                break;
+            }
+            case 2:
+            {
+                cout << "Clearing board..." << endl;
+                clearBoard();
+                response = "{\"status\": \"cleared\"}";
+                break;
+            }
+            default:
+                cout << "Unknown function: " << function << endl;
+            }
+
+            write(client_fd, response.c_str(), response.size());
+
+            close(client_fd);
+        }
+    }
+}
+
+//!! E testing multiple canvases
+
 int main()
 {
     User admin("admin@test.com", "admin");
@@ -116,11 +167,75 @@ int main()
                  int length = session_sockets.size();
                  session_sockets[length] = length;
                  start_child_process(length);
-                 res.set_content("Started whiteboard!", "text/plain"); });
+                 json response_json = json::object();
+                 response_json["session_id"] = length;
+                 string response = response_json.dump();
+                 res.status = 200;
+                 res.set_header("Content-Type", "application/json");
+                 res.set_content(response, "application/json");
+                 //  res.set_content("Started whiteboard!", "text/plain");
+             });
 
-    svr.Post("/messageWhiteboard", [&](const httplib::Request &req, httplib::Response &res)
+    svr.Get("/getBoard", [](const httplib::Request &req, httplib::Response &res)
+            {
+        if (!req.has_param("session_id"))
+        {
+            res.status = 400;
+            res.set_content("Missing session_id", "text/plain");
+            return;
+        }
+
+        string session_id = req.get_param_value("session_id");
+
+        string target_socket = SOCKET_PATH_PREFIX + session_id;
+        int client_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+
+        sockaddr_un addr{};
+        addr.sun_family = AF_UNIX;
+        strcpy(addr.sun_path, target_socket.c_str());
+
+        if (connect(client_fd, (struct sockaddr *)&addr, sizeof(addr)) == 0)
+        {
+            try
+            {
+                json req_json = json::object();
+                req_json["function"] = 1;
+                string request = req_json.dump();
+                size_t request_size = request.size();
+                uint64_t net_size = htonl(request_size); // Convert to network byte order
+                write(client_fd, &net_size, sizeof(net_size)); // Send the size first
+                write(client_fd, request.c_str(), request.size());
+
+                string full_response;
+                char response[65536] = {0};
+                ssize_t bytes_read;
+
+                while ((bytes_read = read(client_fd, response, sizeof(response))) > 0)
+                {
+                    full_response.append(response, bytes_read);
+                }
+                                
+                close(client_fd);
+                json response_json = json::parse(full_response);
+                res.set_header("Content-Type", "application/json");
+                res.set_content(response_json.dump(), "application/json");
+                return;
+            }
+            catch (const json::parse_error &e)
+            {
+                cout << "JSON Parse Error: " << e.what() << endl;
+                res.status = 400;
+                res.set_content("Invalid JSON", "text/plain");
+                return;
+            } 
+        }
+    
+        close(client_fd);
+        res.status = 500;
+        res.set_content("Server Error!", "text/plain"); });
+
+    svr.Post("/drawLine", [&](const httplib::Request &req, httplib::Response &res)
              {
-        
         if (!req.has_param("session_id"))
         {
             res.status = 400;
@@ -142,16 +257,17 @@ int main()
             try
             {
                 json req_json = json::parse(req.body);
-                cout << req_json << endl;
+                req_json["function"] = 0;
                 string request = req_json.dump();
+                size_t request_size = request.size();
+                uint64_t net_size = htonl(request_size); // Convert to network byte order
+                write(client_fd, &net_size, sizeof(net_size)); // Send the size first
                 write(client_fd, request.c_str(), request.size());
-
+                
                 char response[65536] = {0};
                 read(client_fd, response, sizeof(response));
                 cout << "[Main Server] Response: " << response << endl;
 
-                //TODO how do I setup the canvas dependencies in the child process
-                //TODO what do I need to pass to the json to indicate the function, how do I switch between them on the child process
             }
             catch (const json::parse_error &e)
             {
@@ -163,36 +279,55 @@ int main()
         }
     
         close(client_fd);
-        res.set_content("Messaged whiteboard!", "text/plain"); });
-
-    svr.Get("/getBoard", [](const httplib::Request &, httplib::Response &res)
-            {
-        vector<vector<int>> board = getBoard();
-        json board_json = board;
-        res.set_header("Content-Type", "application/json");
-        res.set_content(board_json.dump(), "application/json"); });
-
-    svr.Post("/drawLine", [&](const httplib::Request &req, httplib::Response &res)
-             {
-        try
-        {
-            json req_json = json::parse(req.body);
-
-            DrawWorker *worker = new DrawWorker(pb, req_json);
-            worker->start();
-
-            res.set_content("Drawn!", "text/plain");
-        }
-        catch (const json::parse_error &e)
-        {
-            cout << "JSON Parse Error: " << e.what() << endl;
-            res.status = 400;
-            res.set_content("Invalid JSON", "text/plain");
-        } });
+        res.status = 200;
+        res.set_content("Drew to whiteboard!", "text/plain"); });
 
     svr.Put("/clear", [&](const httplib::Request &req, httplib::Response &res)
             {
-        clearBoard();
+
+        if (!req.has_param("session_id"))
+        {
+            res.status = 400;
+            res.set_content("Missing session_id", "text/plain");
+            return;
+        }
+
+        string session_id = req.get_param_value("session_id");
+
+        string target_socket = SOCKET_PATH_PREFIX + session_id;
+        int client_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+
+        sockaddr_un addr{};
+        addr.sun_family = AF_UNIX;
+        strcpy(addr.sun_path, target_socket.c_str());
+
+        if (connect(client_fd, (struct sockaddr *)&addr, sizeof(addr)) == 0)
+        {
+            try
+            {
+                json req_json = json::object();
+                req_json["function"] = 2;
+                string request = req_json.dump();
+                size_t request_size = request.size();
+                uint64_t net_size = htonl(request_size); // Convert to network byte order
+                write(client_fd, &net_size, sizeof(net_size)); // Send the size first
+                write(client_fd, request.c_str(), request.size());
+                
+                char response[65536] = {0};
+                read(client_fd, response, sizeof(response));
+                cout << "[Main Server] Response: " << response << endl;
+
+            }
+            catch (const json::parse_error &e)
+            {
+                cout << "JSON Parse Error: " << e.what() << endl;
+                res.status = 400;
+                res.set_content("Invalid JSON", "text/plain");
+                return;
+            } 
+        }
+    
+        close(client_fd);
         res.status = 200;
         res.set_content("Board Cleared!", "text/plain");
         return; });

@@ -15,9 +15,12 @@ const Whiteboard = () => {
   const previousPixels = useRef(new Set());
   const previousPixelsTimeout = useRef(null);
 
+  //TODO: create a session
+  //TODO: load the session (set session_id state, append to urls)
+
   const fetchUpdatedCanvas = useCallback(() => {
     openConnection
-      .get("/getBoard")
+      .get("/getBoard?session_id=0")
       .then((response) => {
         console.log("Canvas data fetched");
         let pixels = [];
@@ -49,7 +52,7 @@ const Whiteboard = () => {
 
     const intervalId = setInterval(() => {
       fetchUpdatedCanvas();
-    }, 1000); // This feels like a lot, but it is necessary to get the pixels from the server.
+    }, 2000);
 
     return () => clearInterval(intervalId);
   }, [fetchUpdatedCanvas]);
@@ -134,7 +137,7 @@ const Whiteboard = () => {
       };
       console.log(toSend);
 
-      openConnection.post("/drawLine", toSend).then((response) => {
+      openConnection.post("/drawLine?session_id=0", toSend).then((response) => {
         console.log("Canvas updated:", response.data);
       });
     }
@@ -159,7 +162,7 @@ const Whiteboard = () => {
   const clearCanvas = () => {
     const canvas = canvasRef.current;
     contextRef.current.clearRect(0, 0, canvas.width, canvas.height);
-    openConnection.put("/clear").then((res) => {
+    openConnection.put("/clear?session_id=0").then((res) => {
       console.log("Canvas cleared:", res.data);
     });
   };
