@@ -8,7 +8,7 @@ import SignUp from "./SignUp";
 import NavBar from "./NavBar";
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState("");
   const [showSignUp, setShowSignUp] = useState(false);
 
@@ -36,7 +36,6 @@ function App() {
         <div className="whiteboard-container">
           <NavBar username={username} onLogout={handleLogout} />
           <div className="whiteboard-content">
-            <h1>Whiteboard Canvas</h1>
             <Whiteboard />
           </div>
         </div>
