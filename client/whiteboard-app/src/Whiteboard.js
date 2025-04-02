@@ -1,5 +1,5 @@
 // src/Whiteboard.js
-import React, { useRef, useState, useEffect, useCallback } from "react";
+import React, { useRef, useState, useEffect, useCallback, use } from "react";
 import { colourHexInt, convertIntToRGBA, convertHextoRGBA } from "./utils";
 import { openConnection } from "./Auth/serverConnection";
 
@@ -14,13 +14,16 @@ const Whiteboard = () => {
   const [thickness, setThickness] = useState(5);
   const previousPixels = useRef(new Set());
   const previousPixelsTimeout = useRef(null);
+  const [sessionId, setSessionId] = useState(null); // State to store session ID
+  const [loading, setLoading] = useState(false); // State to manage loading state
 
   //TODO: create a session
   //TODO: load the session (set session_id state, append to urls)
 
   const fetchUpdatedCanvas = useCallback(() => {
+    if (!sessionId) return; // Ensure sessionId is available before making the request
     openConnection
-      .get("/getBoard?session_id=0")
+      .get("/getBoard?session_id=" + sessionId) // Use the session ID in the URL
       .then((response) => {
         console.log("Canvas data fetched");
         let pixels = [];
@@ -34,10 +37,11 @@ const Whiteboard = () => {
       .catch((error) => {
         console.error("Error fetching canvas data:", error);
       });
-  }, []);
+  }, [sessionId]);
 
   // Setup canvas when component mounts
   useEffect(() => {
+    if (!sessionId) return; // Ensure sessionId is available before setting up the canvas
     const canvas = canvasRef.current;
     // Set canvas dimensions and scale for high resolution
     canvas.width = cWidth;
@@ -55,7 +59,7 @@ const Whiteboard = () => {
     }, 2000);
 
     return () => clearInterval(intervalId);
-  }, [fetchUpdatedCanvas]);
+  }, [fetchUpdatedCanvas, sessionId]);
 
   // Start drawing on mouse down
   const startDrawing = ({ nativeEvent }) => {
@@ -137,12 +141,18 @@ const Whiteboard = () => {
       };
       console.log(toSend);
 
-      openConnection.post("/drawLine?session_id=0", toSend).then((response) => {
-        console.log("Canvas updated:", response.data);
-      });
+      openConnection
+        .post("/drawLine?session_id=" + sessionId, toSend)
+        .then((response) => {
+          console.log("Canvas updated:", response.data);
+        });
     }
-    // Store a copy of finalPixels before clearing
-    previousPixels.current = new Set(finalPixels.current);
+
+    // store a copy of combination of previousPixels and finalPixels
+    previousPixels.current = new Set([
+      ...finalPixels.current,
+      ...previousPixels.current,
+    ]);
 
     // Set a timeout to clear the previousPixels after 500ms
     if (previousPixelsTimeout.current) {
@@ -151,7 +161,7 @@ const Whiteboard = () => {
     previousPixelsTimeout.current = setTimeout(() => {
       previousPixels.current.clear();
       previousPixelsTimeout.current = null;
-    }, 1000);
+    }, 800);
 
     finalPixels.current = new Set();
     contextRef.current.closePath();
@@ -162,7 +172,7 @@ const Whiteboard = () => {
   const clearCanvas = () => {
     const canvas = canvasRef.current;
     contextRef.current.clearRect(0, 0, canvas.width, canvas.height);
-    openConnection.put("/clear?session_id=0").then((res) => {
+    openConnection.put("/clear?session_id=" + sessionId).then((res) => {
       console.log("Canvas cleared:", res.data);
     });
   };
@@ -216,8 +226,60 @@ const Whiteboard = () => {
     ctx.putImageData(imageData, 0, 0);
   }
 
+  function createSession() {
+    setLoading(true); // Set loading state to true
+    openConnection
+      .post("/startWhiteboard")
+      .then((response) => {
+        setSessionId(response.data.session_id); // Set the session ID from the response
+        setLoading(false); // Reset loading state
+      })
+      .catch((error) => {
+        console.error("Error creating session:", error);
+        setSessionId(null); // Reset session ID on error
+        setLoading(false); // Reset loading state
+      });
+  }
+
+  function joinSession() {
+    setLoading(true); // Set loading state to true
+    const sessionIdInput = document.querySelector(
+      'input[name="sessionIdInput"]'
+    ); // Get the input field for session ID
+    const sessionIdValue = sessionIdInput.value.trim(); // Get the session ID from the input field
+    setSessionId(sessionIdValue); // Set the session ID state
+    setLoading(false); // Reset loading state
+  }
+
+  if (!sessionId) {
+    return (
+      <div>
+        <h2>Please create or join a session to start drawing.</h2>
+        <button onClick={createSession}>Create Session</button>
+        <p>Join Session:</p>
+        <input
+          name="sessionIdInput"
+          type="text"
+          placeholder="Enter session ID"
+        />
+        <button onClick={joinSession}>Join</button>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div>
+        <h2>Loading...</h2>
+        <p>Please wait while we set up your whiteboard.</p>
+      </div>
+    );
+  }
+
   return (
     <div>
+      <h1>Whiteboard Canvas</h1>
+      <p>Session ID: {sessionId}</p>
       <canvas
         onMouseDown={startDrawing}
         onMouseMove={draw}

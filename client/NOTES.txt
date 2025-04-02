@@ -1,3 +1,5 @@
-Frontend and backend canvas size need to match, should connect these programmatically
+Need to handle process shutdowns (no users active / timeout)
 
-Don't love how many canvas update requests we are sending to the backend, but it's necessary, maybe we could minimize the impact by using serverside result caching
+Need to handle frontend and backend input validation
+
+Need to check concurrent user capabilities

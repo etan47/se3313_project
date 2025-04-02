@@ -50,10 +50,20 @@ string boardToString(vector<vector<int>> board)
 #include <vector>
 #include <map>
 #include <cstring>
+#include <random>
+#include <unordered_set>
+
+int generateRandomID()
+{
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    static std::uniform_int_distribution<int> dis(100000, 999999);
+    return dis(gen);
+}
 
 #define SOCKET_PATH_PREFIX "/tmp/session_"
 
-map<int, int> session_sockets;
+unordered_set<int> session_sockets;
 
 void start_child_process(int session_id)
 {
@@ -118,7 +128,7 @@ void start_child_process(int session_id)
             }
             case 1:
             {
-                cout << "Getting board..." << endl;
+                // cout << "Getting board..." << endl;
                 vector<vector<int>> board = getBoard();
                 json board_json = board;
                 response = board_json.dump();
@@ -164,17 +174,20 @@ int main()
 
     svr.Post("/startWhiteboard", [&](const httplib::Request &, httplib::Response &res)
              {
-                 int length = session_sockets.size();
-                 session_sockets[length] = length;
-                 start_child_process(length);
+                int session_id = generateRandomID();
+                while (session_sockets.find(session_id) != session_sockets.end())
+                {
+                    session_id = generateRandomID(); // Regenerate if ID already exists
+                }
+                session_sockets.insert(session_id); // Store the session ID
+
+                 start_child_process(session_id);
                  json response_json = json::object();
-                 response_json["session_id"] = length;
+                 response_json["session_id"] = session_id;
                  string response = response_json.dump();
                  res.status = 200;
                  res.set_header("Content-Type", "application/json");
-                 res.set_content(response, "application/json");
-                 //  res.set_content("Started whiteboard!", "text/plain");
-             });
+                 res.set_content(response, "application/json"); });
 
     svr.Get("/getBoard", [](const httplib::Request &req, httplib::Response &res)
             {
