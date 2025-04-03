@@ -1,5 +1,13 @@
+#include <mongocxx/client.hpp>
+#include <mongocxx/instance.hpp>
+#include <mongocxx/uri.hpp>
+#include <bsoncxx/json.hpp>
+#include <bsoncxx/builder/stream/document.hpp>
+#include <bsoncxx/builder/stream/array.hpp>
+
 #include "httplib.h"
 #include <iostream>
+#include <fstream>
 
 #include "./Board/board.h"
 #include "./User/user.h"
@@ -11,6 +19,11 @@
 using json = nlohmann::json;
 
 using namespace std;
+
+
+mongocxx::database db;
+mongocxx::collection board_collection;
+mongocxx::collection user_collection;
 
 void *loopGetBuffer(void *arg)
 {
@@ -65,11 +78,93 @@ int generateRandomID()
 
 unordered_set<int> session_sockets;
 
+string getURI(){
+    //grab URI from .env
+    string URI;
+    ifstream file(".env");
+    getline(file, URI);
+    file.close();
+    return URI;
+
+
+}
+void *loopUpdateDB(void *arg){
+
+    string URI = getURI();
+    mongocxx::client client{mongocxx::uri{URI}};
+    db= client["whiteboard"];
+    board_collection= db["board"];
+
+    while (true){
+        sleep(60); //update db every set amount of time
+        vector<vector<int>> board = getBoard();
+
+        // Convert matrix to BSON
+    
+        bsoncxx::builder::stream::document document{};
+        bsoncxx::builder::stream::array matrix_array{};
+
+        for (const auto& row : board) {
+            bsoncxx::builder::stream::array row_array{};
+            for (const auto& value : row) {
+                
+                row_array << value;
+            }
+            matrix_array << row_array;
+        }
+
+        document << "matrix" << matrix_array;
+
+        // Insert into MongoDB
+        
+        board_collection.update_one(
+            bsoncxx::builder::stream::document{} 
+                << "_id" << bsoncxx::oid("67eb041d28dd4abe4c000efb") 
+                << bsoncxx::builder::stream::finalize,  // filter by id
+            bsoncxx::builder::stream::document{} 
+                << "$set" << document.view() 
+                << bsoncxx::builder::stream::finalize,  // update db entry
+            mongocxx::options::update{}.upsert(true) // Create if not found
+        );
+
+        cout << "Matrix updated in MongoDB!" <<endl;
+
+    }
+   
+        
+}
+
 void start_child_process(int session_id)
 {
     pid_t pid = fork();
     if (pid == 0)
     {
+        // Create an instance.
+        mongocxx::instance inst{};
+        
+
+        string URI = getURI();
+        //cout<<URI<<endl;
+        mongocxx::client client{mongocxx::uri{URI}};
+        db= client["whiteboard"];
+        board_collection= db["board"];
+        user_collection = db["users"];
+        try
+        {
+          // Ping the database.
+          const auto ping_cmd = bsoncxx::builder::basic::make_document(bsoncxx::builder::basic::kvp("ping", 1));
+          db.run_command(ping_cmd.view());
+          cout << "Pinged your deployment. You successfully connected to MongoDB!" <<endl;
+    
+        }
+        catch (const std::exception& e)
+        {
+          // Handle errors
+          cout<< "Exception: " << e.what() << endl;
+        }
+
+
+
         string socket_path = SOCKET_PATH_PREFIX + to_string(session_id);
 
         int server_fd = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -86,6 +181,8 @@ void start_child_process(int session_id)
         PixelBuffer *pb = new PixelBuffer();
 
         pthread_t thread = pthread_create(&thread, NULL, loopGetBuffer, (void *)pb);
+
+        pthread_t updateDB = pthread_create(&thread, NULL, loopUpdateDB, (void *)pb);
 
         while (true)
         {
