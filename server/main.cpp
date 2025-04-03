@@ -133,6 +133,7 @@ int main()
     mongocxx::client client{mongocxx::uri{URI}};
     db= client["whiteboard"];
     board_collection= db["board"];
+    user_collection = db["users"];
     try
     {
       // Ping the database.
@@ -296,17 +297,40 @@ int main()
             if (req_json.contains("password")&& req_json["password"].is_string()) {
                 password = req_json["password"];
             }
-            cout<<email<<password<<endl;
-            for (const auto &entry : users){
-                if (entry.email ==email && entry.password==password){
-                    res.status=200;
-                    res.set_content(email+" logged in!", "text/plain");
-                    return;
+            //cout<<email<<password<<endl;
+            // for (const auto &entry : users){
+            //     if (entry.email ==email && entry.password==password){
+            //         res.status=200;
+            //         res.set_content(email+" logged in!", "text/plain");
+            //         return;
                     
+            //     }
+            // }
+
+            bsoncxx::builder::stream::document filter_builder;
+            filter_builder << "email" << email;
+            filter_builder << "password" << password;
+
+        
+            // Execute the query
+            mongocxx::cursor cursor = user_collection.find(filter_builder.view());
+            cout<<"moving"<<endl;
+            if (cursor.begin()!=cursor.end()){
+                cout<<"Found"<<endl;
+                for (auto&& doc : cursor) {
+                    cout << bsoncxx::to_json(doc) << endl;
+                    res.set_content(bsoncxx::to_json(doc), "application/json");
+                    res.status=200;
                 }
+                
+            }else{ //entry not found
+                cout<<"email not found"<<endl;
+                res.set_content("Email not found", "text/plain");
+                res.status=404;
             }
-            res.set_content("Incorrect Email or Password", "text/plain");
-            res.status=401;
+
+            // res.set_content("Incorrect Email or Password", "text/plain");
+            // res.status=401;
 
             
         } catch (const json::parse_error& e) {
