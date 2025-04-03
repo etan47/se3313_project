@@ -5,6 +5,7 @@ import "./SignUp.css"
 import "./Auth/serverConnection.js"
 
 const SignUp = ({ onNavigateToLogin }) => {
+  const [email, setEmail] = useState("")
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [message, setMessage] = useState("")
@@ -19,8 +20,8 @@ const SignUp = ({ onNavigateToLogin }) => {
     } else {
       // Initialize with default accounts if none exist
       const initialAccounts = [
-        { username: "abcdef", password: "123456" },
-        { username: "abcdefg", password: "1234567" },
+        { email: "admin@test.com", username: "Admin", password: "admin" },
+        { email: "bob@test.com", username: "Bob", password: "bob" },
       ]
       localStorage.setItem("accounts", JSON.stringify(initialAccounts))
       setAccounts(initialAccounts)
@@ -30,18 +31,18 @@ const SignUp = ({ onNavigateToLogin }) => {
   const handleCreateAccount = (e) => {
     e.preventDefault()
 
-    // Check if username already exists
-    const userExists = accounts.some((account) => account.username === username)
+    // Check if email already exists
+    const userExists = accounts.some((account) => account.email === email)
 
     if (userExists) {
-      setMessage("Username already exists!")
+      setMessage("email already exists!")
       setIsSuccess(false)
       return
     }
 
     // Create new account
-    const newAccount = { username, password }
-    
+    const newAccount = { email, username, password }
+
     const updatedAccounts = [...accounts, newAccount]
 
     // Save to localStorage (simulating file storage)
@@ -53,6 +54,7 @@ const SignUp = ({ onNavigateToLogin }) => {
     setIsSuccess(true)
 
     // Clear form
+    setEmail("")
     setUsername("")
     setPassword("")
   }
@@ -61,6 +63,10 @@ const SignUp = ({ onNavigateToLogin }) => {
     <div className="signup-container">
       <h2>Create a New Account</h2>
       <form onSubmit={handleCreateAccount} className="signup-form">
+        <div className="form-group">
+          <label htmlFor="new-email">Email:</label>
+          <input type="text" id="new-email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        </div>
         <div className="form-group">
           <label htmlFor="new-username">Username:</label>
           <input

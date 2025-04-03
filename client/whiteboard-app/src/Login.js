@@ -4,12 +4,12 @@ import { useState, useEffect } from "react"
 import "./Login.css"
 
 const Login = ({ onLoginSuccess, onNavigateToSignUp }) => {
-  const [username, setUsername] = useState("")
+  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [accounts, setAccounts] = useState([
-    { username: "abcdef", password: "123456" },
-    { username: "abcdefg", password: "1234567" },
+    { email: "admin@test.com", username: "Admin", password: "admin" },
+    { email: "bob@test.com", username: "Bob", password: "bob" },
   ])
 
   // Load accounts from localStorage on component mount
@@ -23,11 +23,11 @@ const Login = ({ onLoginSuccess, onNavigateToSignUp }) => {
   const handleSubmit = (e) => {
     e.preventDefault()
 
-    // Find if username exists
-    const userMatch = accounts.find((cred) => cred.username === username)
+    // Find if email exists
+    const userMatch = accounts.find((cred) => cred.email === email)
 
     if (!userMatch) {
-      setError("Incorrect username!")
+      setError("Incorrect email!")
       return
     }
 
@@ -39,7 +39,7 @@ const Login = ({ onLoginSuccess, onNavigateToSignUp }) => {
 
     // Login successful
     setError("")
-    onLoginSuccess(username) // Pass the username to App.js
+    onLoginSuccess(email, userMatch.username) // Pass both email and username to App.js
   }
 
   return (
@@ -47,8 +47,8 @@ const Login = ({ onLoginSuccess, onNavigateToSignUp }) => {
       <h2>Login to Whiteboard</h2>
       <form onSubmit={handleSubmit} className="login-form">
         <div className="form-group">
-          <label htmlFor="username">Username:</label>
-          <input type="text" id="username" value={username} onChange={(e) => setUsername(e.target.value)} required />
+          <label htmlFor="email">Email:</label>
+          <input type="text" id="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
         </div>
         <div className="form-group">
           <label htmlFor="password">Password:</label>

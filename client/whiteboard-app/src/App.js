@@ -9,17 +9,17 @@ import NavBar from "./NavBar";
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [showSignUp, setShowSignUp] = useState(false);
 
-  const handleLoginSuccess = (loggedInUsername) => {
-    setUsername(loggedInUsername);
+  const handleLoginSuccess = (loggedInEmail) => {
+    setEmail(loggedInEmail);
     setIsLoggedIn(true);
   };
 
   const handleLogout = () => {
     setIsLoggedIn(false);
-    setUsername("");
+    setEmail("");
   };
 
   const navigateToSignUp = () => {
@@ -34,7 +34,7 @@ function App() {
     <div className="App">
       {isLoggedIn ? (
         <div className="whiteboard-container">
-          <NavBar username={username} onLogout={handleLogout} />
+          <NavBar email={email} onLogout={handleLogout} />
           <div className="whiteboard-content">
             <Whiteboard />
           </div>
