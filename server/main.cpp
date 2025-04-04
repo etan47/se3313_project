@@ -21,6 +21,9 @@ using json = nlohmann::json;
 
 using namespace std;
 
+ // Create an instance.
+ mongocxx::instance inst{};
+        
 
 mongocxx::database db;
 mongocxx::collection board_collection;
@@ -140,9 +143,7 @@ void start_child_process(int session_id)
     pid_t pid = fork();
     if (pid == 0)
     {
-        // Create an instance.
-        mongocxx::instance inst{};
-        
+       
 
         string URI = getURI();
         //cout<<URI<<endl;
@@ -254,7 +255,7 @@ void start_child_process(int session_id)
 
 int main()
 {
-    mongocxx::instance inst{};
+   
         
 
     string URI = getURI();
@@ -301,25 +302,25 @@ int main()
         document << "matrix" << matrix_array;
 
         // Insert into MongoDB
-        try {
-            cout << "Attempting to insert into MongoDB..." << endl;
+        // try {
+        //     cout << "Attempting to insert into MongoDB..." << endl;
         
-            auto result = board_collection.insert_one(document.view());
+        //     auto result = board_collection.insert_one(document.view());
         
-            if (result) {
-                cout << "Insertion successful. Inserted ID: " 
-                          << result->inserted_id().get_oid().value.to_string() 
-                          << endl;
-            } else {
-                cerr << "Insertion failed: No document was inserted." << endl;
-            }
-        } catch (const mongocxx::exception& e) {
-            cerr << "MongoDB Exception: " << e.what() << endl;
-        } catch (const exception& e) {
-            cerr << "Standard Exception: " << e.what() << endl;
-        } catch (...) {
-            cerr << "Unknown error occurred during insertion." << endl;
-        }
+        //     if (result) {
+        //         cout << "Insertion successful. Inserted ID: " 
+        //                   << result->inserted_id().get_oid().value.to_string() 
+        //                   << endl;
+        //     } else {
+        //         cerr << "Insertion failed: No document was inserted." << endl;
+        //     }
+        // } catch (const mongocxx::exception& e) {
+        //     cerr << "MongoDB Exception: " << e.what() << endl;
+        // } catch (const exception& e) {
+        //     cerr << "Standard Exception: " << e.what() << endl;
+        // } catch (...) {
+        //     cerr << "Unknown error occurred during insertion." << endl;
+        // }
 
 
         int session_id = generateRandomID();
