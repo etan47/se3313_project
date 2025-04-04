@@ -2,3 +2,4 @@
 server/.env
 server/server
 server/mongo-cxx-driver-r4.0.0/
+server/mongo-cxx-driver-r4.0.0.tar.gz
