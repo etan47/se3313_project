@@ -4,6 +4,7 @@
 #include <bsoncxx/json.hpp>
 #include <bsoncxx/builder/stream/document.hpp>
 #include <bsoncxx/builder/stream/array.hpp>
+#include <mongocxx/exception/exception.hpp>
 
 #include "httplib.h"
 #include <iostream>
@@ -253,6 +254,16 @@ void start_child_process(int session_id)
 
 int main()
 {
+    mongocxx::instance inst{};
+        
+
+    string URI = getURI();
+    //cout<<URI<<endl;
+    mongocxx::client client{mongocxx::uri{URI}};
+    db= client["whiteboard"];
+    board_collection= db["board"];
+    user_collection = db["users"];
+
     User admin("admin@test.com", "admin");
     User bob("bob@test.com", "bob");
 
@@ -269,22 +280,63 @@ int main()
     svr.Get("/", [](const httplib::Request &, httplib::Response &res)
             { res.set_content("Hello from cpp-httplib!", "text/plain"); });
 
-    svr.Post("/startWhiteboard", [&](const httplib::Request &, httplib::Response &res)
-             {
-                int session_id = generateRandomID();
-                while (session_sockets.find(session_id) != session_sockets.end())
-                {
-                    session_id = generateRandomID(); // Regenerate if ID already exists
-                }
-                session_sockets.insert(session_id); // Store the session ID
+    svr.Post("/startWhiteboard", [&](const httplib::Request &, httplib::Response &res){
+        vector<vector<int>> board = getBoard();
 
-                 start_child_process(session_id);
-                 json response_json = json::object();
-                 response_json["session_id"] = session_id;
-                 string response = response_json.dump();
-                 res.status = 200;
-                 res.set_header("Content-Type", "application/json");
-                 res.set_content(response, "application/json"); });
+        // Convert matrix to BSON
+    
+        bsoncxx::builder::stream::document document{};
+        bsoncxx::builder::stream::array matrix_array{};
+
+        for (const auto& row : board) {
+            bsoncxx::builder::stream::array row_array{};
+            for (const auto& value : row) {
+                
+                row_array << value;
+               
+            }
+            matrix_array << row_array;
+        }
+
+        document << "matrix" << matrix_array;
+
+        // Insert into MongoDB
+        try {
+            cout << "Attempting to insert into MongoDB..." << endl;
+        
+            auto result = board_collection.insert_one(document.view());
+        
+            if (result) {
+                cout << "Insertion successful. Inserted ID: " 
+                          << result->inserted_id().get_oid().value.to_string() 
+                          << endl;
+            } else {
+                cerr << "Insertion failed: No document was inserted." << endl;
+            }
+        } catch (const mongocxx::exception& e) {
+            cerr << "MongoDB Exception: " << e.what() << endl;
+        } catch (const exception& e) {
+            cerr << "Standard Exception: " << e.what() << endl;
+        } catch (...) {
+            cerr << "Unknown error occurred during insertion." << endl;
+        }
+
+
+        int session_id = generateRandomID();
+        while (session_sockets.find(session_id) != session_sockets.end())
+        {
+            session_id = generateRandomID(); // Regenerate if ID already exists
+        }
+        session_sockets.insert(session_id); // Store the session ID
+
+            start_child_process(session_id);
+            json response_json = json::object();
+            response_json["session_id"] = session_id;
+            string response = response_json.dump();
+            res.status = 200;
+            res.set_header("Content-Type", "application/json");
+            res.set_content(response, "application/json"); 
+    });
 
     svr.Get("/getBoard", [](const httplib::Request &req, httplib::Response &res)
             {
@@ -442,42 +494,117 @@ int main()
         res.set_content("Board Cleared!", "text/plain");
         return; });
 
-    svr.Post("/login", [&](const httplib::Request &req, httplib::Response &res)
-             {
-        string email;
-        string password;
+        svr.Post("/login", [&](const httplib::Request &req, httplib::Response &res){
+        
 
-        try
-        {
-            json req_json = json::parse(req.body);
-            cout << req_json << endl;
-            if (req_json.contains("email") && req_json["email"].is_string())
-            {
-                email = req_json["email"];
-            }
-            if (req_json.contains("password") && req_json["password"].is_string())
-            {
-                password = req_json["password"];
-            }
-            cout << email << password << endl;
-            for (const auto &entry : users)
-            {
-                if (entry.email == email && entry.password == password)
-                {
-                    res.status = 200;
-                    res.set_content(email + " logged in!", "text/plain");
-                    return;
+            string email;
+            string password;
+            
+            try{
+                json req_json = json::parse(req.body);
+                cout<<req_json<<endl;
+                if (req_json.contains("email")&& req_json["email"].is_string()) {
+                    email = req_json["email"];
                 }
+                if (req_json.contains("password")&& req_json["password"].is_string()) {
+                    password = req_json["password"];
+                }
+                //cout<<email<<password<<endl;
+                // for (const auto &entry : users){
+                //     if (entry.email ==email && entry.password==password){
+                //         res.status=200;
+                //         res.set_content(email+" logged in!", "text/plain");
+                //         return;
+                        
+                //     }
+                // }
+    
+                bsoncxx::builder::stream::document filter_builder;
+                filter_builder << "email" << email;
+                filter_builder << "password" << password;
+    
+            
+                // Execute the query
+                mongocxx::cursor cursor = user_collection.find(filter_builder.view());
+                cout<<"moving"<<endl;
+                if (cursor.begin()!=cursor.end()){
+                    cout<<"Found"<<endl;
+                    for (auto&& doc : cursor) {
+                        cout << bsoncxx::to_json(doc) << endl;
+                        res.set_content(bsoncxx::to_json(doc), "application/json");
+                        res.status=200;
+                    }
+                    
+                }else{ //entry not found
+                    cout<<"email not found"<<endl;
+                    res.set_content("Email not found", "text/plain");
+                    res.status=404;
+                }
+    
+                // res.set_content("Incorrect Email or Password", "text/plain");
+                // res.status=401;
+    
+                
+            } catch (const json::parse_error& e) {
+                cout << "JSON Parse Error: " << e.what() << endl;
+                res.status = 400;  
+                res.set_content("Invalid JSON", "text/plain");
             }
-            res.set_content("Incorrect Email or Password", "text/plain");
-            res.status = 401;
-        }
-        catch (const json::parse_error &e)
+        });
+
+        svr.Get("/getBoardFromDB", [](const httplib::Request &, httplib::Response &res)
         {
-            cout << "JSON Parse Error: " << e.what() << endl;
-            res.status = 400;
-            res.set_content("Invalid JSON", "text/plain");
-        } });
+    
+    
+            bsoncxx::oid object_id("67eb041d28dd4abe4c000efb");  //hardcoded id
+            bsoncxx::builder::stream::document filter_builder;
+            filter_builder << "_id" << object_id;
+        
+            auto board = board_collection.find_one(filter_builder.view());
+    
+            string json_str = bsoncxx::to_json(board->view()); // Convert BSON to JSON string
+            nlohmann::json board_json = nlohmann::json::parse(json_str); //parse json
+           
+    
+            res.set_header("Content-Type", "application/json");
+            res.set_content(board_json.dump(), "application/json"); 
+        });
+        svr.Post("/closeBoard", [](const httplib::Request &, httplib::Response &res)
+        {
+                vector<vector<int>> board = getBoard();
+        
+                // Convert matrix to BSON
+            
+                bsoncxx::builder::stream::document document{};
+                bsoncxx::builder::stream::array matrix_array{};
+        
+                for (const auto& row : board) {
+                    bsoncxx::builder::stream::array row_array{};
+                    for (const auto& value : row) {
+                        
+                        row_array << value;
+                    }
+                    matrix_array << row_array;
+                }
+        
+                document << "matrix" << matrix_array;
+        
+                // Insert into MongoDB
+                
+                board_collection.update_one(
+                    bsoncxx::builder::stream::document{} 
+                        << "_id" << bsoncxx::oid("67eb041d28dd4abe4c000efb") 
+                        << bsoncxx::builder::stream::finalize,  // filter by id
+                    bsoncxx::builder::stream::document{} 
+                        << "$set" << document.view() 
+                        << bsoncxx::builder::stream::finalize,  // update db entry
+                    mongocxx::options::update{}.upsert(true) // Create if not found
+                );
+        
+                cout << "Matrix updated before closing Board in MongoDB!" <<endl;
+                res.set_content("Matrix updated in MongoDB!", "text/plain");
+        
+        });
 
     svr.Post("/register", [&](const httplib::Request &req, httplib::Response &res)
              {
@@ -540,7 +667,8 @@ int main()
             cout << "JSON Parse Error: " << e.what() << endl;
             res.status = 400;
             res.set_content("Invalid JSON", "text/plain");
-        } });
+        } 
+    });
 
     std::cout << "Server is running on port 8080..." << std::endl;
     svr.listen("0.0.0.0", 8080);
