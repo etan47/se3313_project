@@ -1,3 +1,32 @@
+# Install dependancies for mongodb
+
+## Download c++ driver on server machine
+
+`curl -OL https://github.com/mongodb/mongo-cxx-driver/releases/download/r4.0.0/mongo-cxx-driver-r4.0.0.tar.gz`
+
+`tar -xzf mongo-cxx-driver-r4.0.0.tar.gz`
+
+`cd mongo-cxx-driver-r4.0.0/build`
+
+## Configure driver
+
+`apt-get install libssl-dev`
+
+`cmake .. \`
+
+`-DCMAKE_BUILD_TYPE=Release \`
+
+`-DCMAKE_CXX_STANDARD=17`
+
+## Build and install
+
+`cmake --build .`
+
+`sudo cmake --build . --target install`
+(If it doesnt work try without sudo)
+
+`export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib` (may need to change the path for your computer, find the path with the file "libmongocxx.so.\_noabi")
+
 # Getting Started with Create React App
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
