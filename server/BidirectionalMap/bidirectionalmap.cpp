@@ -56,3 +56,13 @@ void BidirectionalMap::removeSeID(int seID)
         dbToSe.erase(dbID);
     }
 }
+
+std::string BidirectionalMap::getAllEntries() const
+{
+    std::string result;
+    for (const auto &pair : dbToSe)
+    {
+        result += "DB ID: " + pair.first + ", SE ID: " + std::to_string(pair.second) + "\n";
+    }
+    return result;
+}

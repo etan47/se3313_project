@@ -68,6 +68,7 @@ string boardToString(vector<vector<int>> board)
 #include "./BidirectionalMap/bidirectionalmap.h"
 #include <cstring>
 #include <random>
+#include <sys/wait.h>
 
 int generateRandomID()
 {
@@ -79,7 +80,24 @@ int generateRandomID()
 
 #define SOCKET_PATH_PREFIX "/tmp/session_"
 
+map<pid_t, int> pid_to_session_id_map; // Map to store pid to session id mapping
 BidirectionalMap db_se_map;
+
+void sigchld_handler(int signum)
+{
+    // Wait for any child process to terminate and clean up the session ID
+    int status;
+    pid_t pid = waitpid(-1, &status, WNOHANG);   // Non-blocking call
+    int session_id = pid_to_session_id_map[pid]; // Get the session ID from the map
+    pid_to_session_id_map.erase(pid);            // Remove the pid from the map
+
+    if (pid > 0)
+    {
+        db_se_map.removeSeID(session_id);
+
+        cout << "[Parent] Cleaned up session " << session_id << endl;
+    }
+}
 
 string getURI()
 {
@@ -180,14 +198,53 @@ void start_child_process(int session_id)
 
         PixelBuffer *pb = new PixelBuffer();
 
-        pthread_t thread = pthread_create(&thread, NULL, loopGetBuffer, (void *)pb);
+        pthread_t getBufferThread, updateDBThread;
+
+        pthread_create(&getBufferThread, NULL, loopGetBuffer, (void *)pb);
 
         string db_id = db_se_map.getDbID(session_id); // Get the db id from the session id
         string *db_id_ptr = new string(db_id);        // Create a pointer to the db id
-        pthread_t updateDB = pthread_create(&thread, NULL, loopUpdateDB, (void *)db_id_ptr);
+        pthread_create(&updateDBThread, NULL, loopUpdateDB, (void *)db_id_ptr);
+
+        // const int TIMEOUT_SECONDS = 300; // 5 minutes timeout
+        const int TIMEOUT_SECONDS = 40; //! 40 seconds timeout for testing
 
         while (true)
         {
+            fd_set read_fds;
+            FD_ZERO(&read_fds);
+            FD_SET(server_fd, &read_fds);
+
+            struct timeval timeout;
+            timeout.tv_sec = TIMEOUT_SECONDS;
+            timeout.tv_usec = 0;
+
+            int activity = select(server_fd + 1, &read_fds, nullptr, nullptr, &timeout);
+            if (activity < 0)
+            {
+                cout << "Error in select()" << endl;
+                continue;
+            }
+            else if (activity == 0)
+            {
+                cout << "Timeout occurred. No data after " << TIMEOUT_SECONDS << " seconds." << endl;
+                pthread_cancel(getBufferThread);
+                pthread_cancel(updateDBThread);
+
+                pthread_join(getBufferThread, NULL);
+                pthread_join(updateDBThread, NULL);
+
+                delete pb;
+                delete db_id_ptr;
+
+                close(server_fd);
+                unlink(socket_path.c_str());
+
+                cout << "Session " << session_id << " closed." << endl;
+
+                exit(0); // Exit the child process
+            }
+
             int client_fd = accept(server_fd, nullptr, nullptr);
             if (client_fd < 0)
                 continue;
@@ -240,6 +297,50 @@ void start_child_process(int session_id)
                 response = "{\"status\": \"cleared\"}";
                 break;
             }
+            case 3:
+            {
+                // load the matrix from the request
+                cout << "Loading matrix..." << endl;
+                auto matrix = received_json["matrix"]; //! testing
+                // create an object for each matrix value that holds colour, and an array of pixels, where each pixel is a pair of x and y coordinates
+                map<int, json> matrix_map;
+
+                if (matrix.is_array())
+                { // Check if matrix is an array
+                    for (int i = 0; i < matrix.size(); i++)
+                    {
+                        if (matrix[i].is_array())
+                        { // check if matrix[i] is an array.
+                            for (int j = 0; j < matrix[i].size(); j++)
+                            {
+                                if (matrix[i][j].is_number_integer())
+                                { // check if the value is an integer.
+                                    int value = matrix[i][j].get<int>();
+
+                                    if (matrix_map.find(value) == matrix_map.end())
+                                    {
+                                        matrix_map[value] = json::object();
+                                        matrix_map[value]["colour"] = value;
+                                        matrix_map[value]["pixels"] = json::array();
+                                    }
+
+                                    matrix_map[value]["pixels"].push_back(json::object());
+                                    matrix_map[value]["pixels"].back()["x"] = i;
+                                    matrix_map[value]["pixels"].back()["y"] = j;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                for (const auto &entry : matrix_map)
+                {
+                    DrawWorker *worker = new DrawWorker(pb, entry);
+                    worker->start();
+                }
+                response = "{\"status\": \"loaded\"}";
+                break;
+            }
             default:
                 cout << "Unknown function: " << function << endl;
             }
@@ -249,10 +350,20 @@ void start_child_process(int session_id)
             close(client_fd);
         }
     }
+    else if (pid > 0)
+    {
+        // Parent process
+        pid_to_session_id_map[pid] = session_id; // Store the mapping of pid to session id
+    }
 }
 
 int main()
 {
+    // Register signal handler for SIGCHLD
+    struct sigaction sa;
+    sa.sa_handler = sigchld_handler; // Specify handler function
+    sa.sa_flags = SA_RESTART;        // Restart system calls if interrupted
+    sigaction(SIGCHLD, &sa, NULL);   // Register the signal handler
 
     string URI = getURI();
     // cout<<URI<<endl;
@@ -273,8 +384,136 @@ int main()
     svr.Get("/", [](const httplib::Request &, httplib::Response &res)
             { res.set_content("Hello from cpp-httplib!", "text/plain"); });
 
+    svr.Post("/loadWhiteboard", [&](const httplib::Request &req, httplib::Response &res)
+             {
+                 if (!req.has_param("db_id"))
+                 {
+                     res.status = 400;
+                     res.set_content("Missing db_id", "text/plain");
+                     return;
+                 }
+
+                 string db_id = req.get_param_value("db_id");
+
+                 if (db_se_map.containsDbID(db_id))
+                 {
+                     json response_json = json::object();
+                     response_json["session_id"] = db_se_map.getSeID(db_id);
+                     string response = response_json.dump();
+                     res.status = 200;
+                     res.set_header("Content-Type", "application/json");
+                     res.set_content(response, "application/json");
+                     return;
+                 }
+
+                 // Get from MongoDB
+                 try
+                 {
+                     cout << "Attempting to load from MongoDB..." << endl;
+
+                    auto result = board_collection.find_one(bsoncxx::builder::stream::document{} << "_id" << bsoncxx::oid(db_id) << bsoncxx::builder::stream::finalize);
+
+                     if (result)
+                     {
+                         cout << "Retrieval successful. Found ID: "
+                              << db_id << endl;
+
+                              int session_id = generateRandomID();
+                              while (db_se_map.containsSeID(session_id))
+                              {
+                                  session_id = generateRandomID(); // Regenerate if ID already exists
+                              }
+                              db_se_map.insert(db_id, session_id); // Map the ID to the session ID
+             
+                              start_child_process(session_id);
+                              // set small timeout to allow the child process to start
+                              
+                              //todo : get the matrix from the db and set it to the board
+                              string target_socket = SOCKET_PATH_PREFIX + session_id;
+                                int client_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+
+                                sockaddr_un addr{};
+                                addr.sun_family = AF_UNIX;
+                                strcpy(addr.sun_path, target_socket.c_str());
+
+                                cout << "here1" << endl;
+
+                                if (connect(client_fd, (struct sockaddr *)&addr, sizeof(addr)) == 0)
+                                {
+                                    cout << "here2" << endl;
+
+                                    try
+                                    {
+                                        cout << "Connected to child process at " << target_socket << endl;
+                                        // Read the matrix from the database
+                                        //*S this works
+                                        auto matrix = result->view()["matrix"].get_array().value;
+                                        json req_json = json::object();
+                                        req_json["function"] = 3;
+                                        req_json["matrix"] = json::array();
+                                        for (const auto &row : matrix)
+                                        {
+                                            json row_json = json::array();
+                                            for (const auto &cell : row.get_array().value)
+                                            {
+                                                row_json.push_back(cell.get_int32().value);
+                                            }
+                                            req_json["matrix"].push_back(row_json);
+                                        }
+                                        //*E this works
+
+                                        string request = req_json.dump();
+                                        size_t request_size = request.size();
+                                        uint64_t net_size = htonl(request_size); // Convert to network byte order
+                                        write(client_fd, &net_size, sizeof(net_size)); // Send the size first
+                                        write(client_fd, request.c_str(), request.size());
+                                        
+                                        char response[65536] = {0};
+                                        read(client_fd, response, sizeof(response));
+                                        cout << "[Main Server] Response: " << response << endl;
+
+                                    }
+                                    catch (const json::parse_error &e)
+                                    {
+                                        cout << "JSON Parse Error: " << e.what() << endl;
+                                        res.status = 400;
+                                        res.set_content("Invalid JSON", "text/plain");
+                                        return;
+                                    } 
+                                }
+                            
+                                close(client_fd);
+             
+                              json response_json = json::object();
+                              response_json["session_id"] = session_id;
+                              string response = response_json.dump();
+                              res.status = 200;
+                              res.set_header("Content-Type", "application/json");
+                              res.set_content(response, "application/json");
+
+                     }
+                     else
+                     {
+                         cerr << "Search failed: No document was found." << endl;
+                     }
+                 }
+                 catch (const mongocxx::exception &e)
+                 {
+                     cerr << "MongoDB Exception: " << e.what() << endl;
+                 }
+                 catch (const exception &e)
+                 {
+                     cerr << "Standard Exception: " << e.what() << endl;
+                 }
+                 catch (...)
+                 {
+                     cerr << "Unknown error occurred during insertion." << endl;
+                 } });
+
     svr.Post("/startWhiteboard", [&](const httplib::Request &, httplib::Response &res)
              {
+                cout << "Parent" << db_se_map.getAllEntries() << endl;
+
         vector<vector<int>> board = getBoard();
 
         // Convert matrix to BSON

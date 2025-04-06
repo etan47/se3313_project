@@ -19,6 +19,7 @@ struct BidirectionalMap
     std::string getDbID(int seID) const;
     void removeDbID(const std::string &dbID);
     void removeSeID(int seID);
+    std::string getAllEntries() const;
 };
 
 #endif // BIDIRECTIONAL_MAP_H
