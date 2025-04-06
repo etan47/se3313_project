@@ -1,0 +1,9 @@
+Need to handle process shutdowns (no users active / timeout)
+
+Need to handle frontend and backend input validation
+
+Need to check concurrent user capabilities
+
+Need to implement whiteboard history for users
+
+Need to implement starting a whiteboard from history

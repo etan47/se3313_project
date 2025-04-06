@@ -1,5 +1,0 @@
-Need to handle process shutdowns (no users active / timeout)
-
-Need to handle frontend and backend input validation
-
-Need to check concurrent user capabilities

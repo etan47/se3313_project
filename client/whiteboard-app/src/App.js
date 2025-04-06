@@ -8,7 +8,7 @@ import SignUp from "./SignUp";
 import NavBar from "./NavBar";
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(true); //! Set to true for testing purposes
   const [email, setEmail] = useState("");
   const [showSignUp, setShowSignUp] = useState(false);
 

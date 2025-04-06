@@ -21,9 +21,8 @@ using json = nlohmann::json;
 
 using namespace std;
 
- // Create an instance.
- mongocxx::instance inst{};
-        
+// Create an instance.
+mongocxx::instance inst{};
 
 mongocxx::database db;
 mongocxx::collection board_collection;
@@ -60,15 +59,15 @@ string boardToString(vector<vector<int>> board)
     return result;
 }
 
-//! S testing multiple canvases
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
 #include <vector>
 #include <map>
+#include <unordered_set>
+#include "./BidirectionalMap/bidirectionalmap.h"
 #include <cstring>
 #include <random>
-#include <unordered_set>
 
 int generateRandomID()
 {
@@ -80,38 +79,44 @@ int generateRandomID()
 
 #define SOCKET_PATH_PREFIX "/tmp/session_"
 
-unordered_set<int> session_sockets;
+BidirectionalMap db_se_map;
 
-string getURI(){
-    //grab URI from .env
+string getURI()
+{
+    // grab URI from .env
     string URI;
     ifstream file(".env");
     getline(file, URI);
     file.close();
     return URI;
-
-
 }
-void *loopUpdateDB(void *arg){
+
+void *loopUpdateDB(void *arg)
+{
+
+    string *db_id = (string *)arg;
 
     string URI = getURI();
     mongocxx::client client{mongocxx::uri{URI}};
-    db= client["whiteboard"];
-    board_collection= db["board"];
+    db = client["whiteboard"];
+    board_collection = db["board"];
 
-    while (true){
-        sleep(60); //update db every set amount of time
+    while (true)
+    {
+        sleep(60); // update db every set amount of time
         vector<vector<int>> board = getBoard();
 
         // Convert matrix to BSON
-    
+
         bsoncxx::builder::stream::document document{};
         bsoncxx::builder::stream::array matrix_array{};
 
-        for (const auto& row : board) {
+        for (const auto &row : board)
+        {
             bsoncxx::builder::stream::array row_array{};
-            for (const auto& value : row) {
-                
+            for (const auto &value : row)
+            {
+
                 row_array << value;
             }
             matrix_array << row_array;
@@ -120,22 +125,19 @@ void *loopUpdateDB(void *arg){
         document << "matrix" << matrix_array;
 
         // Insert into MongoDB
-        
+
         board_collection.update_one(
-            bsoncxx::builder::stream::document{} 
-                << "_id" << bsoncxx::oid("67eb041d28dd4abe4c000efb") 
-                << bsoncxx::builder::stream::finalize,  // filter by id
-            bsoncxx::builder::stream::document{} 
-                << "$set" << document.view() 
-                << bsoncxx::builder::stream::finalize,  // update db entry
-            mongocxx::options::update{}.upsert(true) // Create if not found
+            bsoncxx::builder::stream::document{}
+                << "_id" << bsoncxx::oid(*db_id)
+                << bsoncxx::builder::stream::finalize, // filter by id
+            bsoncxx::builder::stream::document{}
+                << "$set" << document.view()
+                << bsoncxx::builder::stream::finalize, // update db entry
+            mongocxx::options::update{}.upsert(true)   // Create if not found
         );
 
-        cout << "Matrix updated in MongoDB!" <<endl;
-
+        cout << "Matrix updated in MongoDB!" << endl;
     }
-   
-        
 }
 
 void start_child_process(int session_id)
@@ -143,29 +145,25 @@ void start_child_process(int session_id)
     pid_t pid = fork();
     if (pid == 0)
     {
-       
 
         string URI = getURI();
-        //cout<<URI<<endl;
+        // cout<<URI<<endl;
         mongocxx::client client{mongocxx::uri{URI}};
-        db= client["whiteboard"];
-        board_collection= db["board"];
+        db = client["whiteboard"];
+        board_collection = db["board"];
         user_collection = db["users"];
         try
         {
-          // Ping the database.
-          const auto ping_cmd = bsoncxx::builder::basic::make_document(bsoncxx::builder::basic::kvp("ping", 1));
-          db.run_command(ping_cmd.view());
-          cout << "Pinged your deployment. You successfully connected to MongoDB!" <<endl;
-    
+            // Ping the database.
+            const auto ping_cmd = bsoncxx::builder::basic::make_document(bsoncxx::builder::basic::kvp("ping", 1));
+            db.run_command(ping_cmd.view());
+            cout << "Pinged your deployment. You successfully connected to MongoDB!" << endl;
         }
-        catch (const std::exception& e)
+        catch (const std::exception &e)
         {
-          // Handle errors
-          cout<< "Exception: " << e.what() << endl;
+            // Handle errors
+            cout << "Exception: " << e.what() << endl;
         }
-
-
 
         string socket_path = SOCKET_PATH_PREFIX + to_string(session_id);
 
@@ -184,7 +182,9 @@ void start_child_process(int session_id)
 
         pthread_t thread = pthread_create(&thread, NULL, loopGetBuffer, (void *)pb);
 
-        pthread_t updateDB = pthread_create(&thread, NULL, loopUpdateDB, (void *)pb);
+        string db_id = db_se_map.getDbID(session_id); // Get the db id from the session id
+        string *db_id_ptr = new string(db_id);        // Create a pointer to the db id
+        pthread_t updateDB = pthread_create(&thread, NULL, loopUpdateDB, (void *)db_id_ptr);
 
         while (true)
         {
@@ -251,18 +251,14 @@ void start_child_process(int session_id)
     }
 }
 
-//!! E testing multiple canvases
-
 int main()
 {
-   
-        
 
     string URI = getURI();
-    //cout<<URI<<endl;
+    // cout<<URI<<endl;
     mongocxx::client client{mongocxx::uri{URI}};
-    db= client["whiteboard"];
-    board_collection= db["board"];
+    db = client["whiteboard"];
+    board_collection = db["board"];
     user_collection = db["users"];
 
     User admin("admin@test.com", "admin");
@@ -272,16 +268,13 @@ int main()
     users.push_back(admin);
     users.push_back(bob);
 
-    PixelBuffer *pb = new PixelBuffer();
-
-    pthread_t thread = pthread_create(&thread, NULL, loopGetBuffer, (void *)pb);
-
     httplib::Server svr;
 
     svr.Get("/", [](const httplib::Request &, httplib::Response &res)
             { res.set_content("Hello from cpp-httplib!", "text/plain"); });
 
-    svr.Post("/startWhiteboard", [&](const httplib::Request &, httplib::Response &res){
+    svr.Post("/startWhiteboard", [&](const httplib::Request &, httplib::Response &res)
+             {
         vector<vector<int>> board = getBoard();
 
         // Convert matrix to BSON
@@ -301,6 +294,8 @@ int main()
 
         document << "matrix" << matrix_array;
 
+        string whiteboardID;
+
         //Insert into MongoDB
         try {
             cout << "Attempting to insert into MongoDB..." << endl;
@@ -308,9 +303,9 @@ int main()
             auto result = board_collection.insert_one(document.view());
         
             if (result) {
+                whiteboardID = result->inserted_id().get_oid().value.to_string();
                 cout << "Insertion successful. Inserted ID: " 
-                          << result->inserted_id().get_oid().value.to_string() 
-                          << endl;
+                          << whiteboardID << endl; 
             } else {
                 cerr << "Insertion failed: No document was inserted." << endl;
             }
@@ -324,11 +319,11 @@ int main()
 
 
         int session_id = generateRandomID();
-        while (session_sockets.find(session_id) != session_sockets.end())
+        while (db_se_map.containsSeID(session_id))
         {
             session_id = generateRandomID(); // Regenerate if ID already exists
         }
-        session_sockets.insert(session_id); // Store the session ID
+        db_se_map.insert(whiteboardID, session_id); // Map the ID to the session ID
 
             start_child_process(session_id);
             json response_json = json::object();
@@ -336,8 +331,7 @@ int main()
             string response = response_json.dump();
             res.status = 200;
             res.set_header("Content-Type", "application/json");
-            res.set_content(response, "application/json"); 
-    });
+            res.set_content(response, "application/json"); });
 
     svr.Get("/getBoard", [](const httplib::Request &req, httplib::Response &res)
             {
@@ -349,6 +343,13 @@ int main()
         }
 
         string session_id = req.get_param_value("session_id");
+
+        if (!db_se_map.containsSeID(stoi(session_id)))
+        {
+            res.status = 400;
+            res.set_content("Invalid session_id", "text/plain");
+            return;
+        }
 
         string target_socket = SOCKET_PATH_PREFIX + session_id;
         int client_fd = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -408,6 +409,13 @@ int main()
 
         string session_id = req.get_param_value("session_id");
 
+        if (!db_se_map.containsSeID(stoi(session_id)))
+        {
+            res.status = 400;
+            res.set_content("Invalid session_id", "text/plain");
+            return;
+        }
+
         string target_socket = SOCKET_PATH_PREFIX + session_id;
         int client_fd = socket(AF_UNIX, SOCK_STREAM, 0);
 
@@ -457,6 +465,19 @@ int main()
 
         string session_id = req.get_param_value("session_id");
 
+        // if (session_sockets.find(stoi(session_id)) == session_sockets.end())
+        // {
+        //     res.status = 400;
+        //     res.set_content("Invalid session_id", "text/plain");
+        //     return;
+        // }
+        if (!db_se_map.containsSeID(stoi(session_id)))
+        {
+            res.status = 400;
+            res.set_content("Invalid session_id", "text/plain");
+            return;
+        }
+
         string target_socket = SOCKET_PATH_PREFIX + session_id;
         int client_fd = socket(AF_UNIX, SOCK_STREAM, 0);
 
@@ -495,7 +516,8 @@ int main()
         res.set_content("Board Cleared!", "text/plain");
         return; });
 
-        svr.Post("/login", [&](const httplib::Request &req, httplib::Response &res){
+    svr.Post("/login", [&](const httplib::Request &req, httplib::Response &res)
+             {
         
 
             string email;
@@ -550,11 +572,10 @@ int main()
                 cout << "JSON Parse Error: " << e.what() << endl;
                 res.status = 400;  
                 res.set_content("Invalid JSON", "text/plain");
-            }
-        });
+            } });
 
-        svr.Get("/getBoardFromDB", [](const httplib::Request &, httplib::Response &res)
-        {
+    svr.Get("/getBoardFromDB", [](const httplib::Request &, httplib::Response &res)
+            {
     
     
             bsoncxx::oid object_id("67eb041d28dd4abe4c000efb");  //hardcoded id
@@ -568,44 +589,43 @@ int main()
            
     
             res.set_header("Content-Type", "application/json");
-            res.set_content(board_json.dump(), "application/json"); 
-        });
-        svr.Post("/closeBoard", [](const httplib::Request &, httplib::Response &res)
-        {
-                vector<vector<int>> board = getBoard();
-        
-                // Convert matrix to BSON
-            
-                bsoncxx::builder::stream::document document{};
-                bsoncxx::builder::stream::array matrix_array{};
-        
-                for (const auto& row : board) {
-                    bsoncxx::builder::stream::array row_array{};
-                    for (const auto& value : row) {
-                        
-                        row_array << value;
-                    }
-                    matrix_array << row_array;
-                }
-        
-                document << "matrix" << matrix_array;
-        
-                // Insert into MongoDB
-                
-                board_collection.update_one(
-                    bsoncxx::builder::stream::document{} 
-                        << "_id" << bsoncxx::oid("67eb041d28dd4abe4c000efb") 
-                        << bsoncxx::builder::stream::finalize,  // filter by id
-                    bsoncxx::builder::stream::document{} 
-                        << "$set" << document.view() 
-                        << bsoncxx::builder::stream::finalize,  // update db entry
-                    mongocxx::options::update{}.upsert(true) // Create if not found
-                );
-        
-                cout << "Matrix updated before closing Board in MongoDB!" <<endl;
-                res.set_content("Matrix updated in MongoDB!", "text/plain");
-        
-        });
+            res.set_content(board_json.dump(), "application/json"); });
+    svr.Post("/closeBoard", [](const httplib::Request &, httplib::Response &res)
+             {
+                 vector<vector<int>> board = getBoard();
+
+                 // Convert matrix to BSON
+
+                 bsoncxx::builder::stream::document document{};
+                 bsoncxx::builder::stream::array matrix_array{};
+
+                 for (const auto &row : board)
+                 {
+                     bsoncxx::builder::stream::array row_array{};
+                     for (const auto &value : row)
+                     {
+
+                         row_array << value;
+                     }
+                     matrix_array << row_array;
+                 }
+
+                 document << "matrix" << matrix_array;
+
+                 // Insert into MongoDB
+
+                 board_collection.update_one(
+                     bsoncxx::builder::stream::document{}
+                         << "_id" << bsoncxx::oid("67eb041d28dd4abe4c000efb")
+                         << bsoncxx::builder::stream::finalize, // filter by id
+                     bsoncxx::builder::stream::document{}
+                         << "$set" << document.view()
+                         << bsoncxx::builder::stream::finalize, // update db entry
+                     mongocxx::options::update{}.upsert(true)   // Create if not found
+                 );
+
+                 cout << "Matrix updated before closing Board in MongoDB!" << endl;
+                 res.set_content("Matrix updated in MongoDB!", "text/plain"); });
 
     svr.Post("/register", [&](const httplib::Request &req, httplib::Response &res)
              {
@@ -668,8 +688,7 @@ int main()
             cout << "JSON Parse Error: " << e.what() << endl;
             res.status = 400;
             res.set_content("Invalid JSON", "text/plain");
-        } 
-    });
+        } });
 
     std::cout << "Server is running on port 8080..." << std::endl;
     svr.listen("0.0.0.0", 8080);
