@@ -1,63 +1,51 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import "./SignUp.css"
-import "./Auth/serverConnection.js"
+import { useState } from "react";
+import { openConnection } from "./Auth/serverConnection";
+import "./SignUp.css";
+import "./Auth/serverConnection.js";
 
 const SignUp = ({ onNavigateToLogin }) => {
-  const [email, setEmail] = useState("")
-  const [username, setUsername] = useState("")
-  const [password, setPassword] = useState("")
-  const [message, setMessage] = useState("")
-  const [isSuccess, setIsSuccess] = useState(false)
-  const [accounts, setAccounts] = useState([])
+  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [message, setMessage] = useState("");
+  const [isSuccess, setIsSuccess] = useState(false);
 
-  // Load existing accounts from localStorage on component mount
-  useEffect(() => {
-    const storedAccounts = localStorage.getItem("accounts")
-    if (storedAccounts) {
-      setAccounts(JSON.parse(storedAccounts))
-    } else {
-      // Initialize with default accounts if none exist
-      const initialAccounts = [
-        { email: "admin@test.com", username: "Admin", password: "admin" },
-        { email: "bob@test.com", username: "Bob", password: "bob" },
-      ]
-      localStorage.setItem("accounts", JSON.stringify(initialAccounts))
-      setAccounts(initialAccounts)
+  const handleCreateAccount = async (e) => {
+    e.preventDefault();
+
+    try {
+      setMessage("");
+
+      let result = await openConnection.post("/register", {
+        email: email,
+        username: username,
+        password: password,
+      });
+
+      // Show success message
+      setMessage("Your account was created successfully!");
+      setIsSuccess(true);
+
+      // Clear form
+      setEmail("");
+      setUsername("");
+      setPassword("");
+    } catch (error) {
+      console.error("Error creating account:", error);
+
+      if (error.response && error.response.status === 409) {
+        setMessage("Email already exists!");
+        setIsSuccess(false);
+        return;
+      }
+
+      setMessage("Account creation failed. Please try again.");
+      setIsSuccess(false);
+      return;
     }
-  }, [])
-
-  const handleCreateAccount = (e) => {
-    e.preventDefault()
-
-    // Check if email already exists
-    const userExists = accounts.some((account) => account.email === email)
-
-    if (userExists) {
-      setMessage("email already exists!")
-      setIsSuccess(false)
-      return
-    }
-
-    // Create new account
-    const newAccount = { email, username, password }
-
-    const updatedAccounts = [...accounts, newAccount]
-
-    // Save to localStorage (simulating file storage)
-    localStorage.setItem("accounts", JSON.stringify(updatedAccounts))
-    setAccounts(updatedAccounts)
-
-    // Show success message
-    setMessage("Your account was created successfully!")
-    setIsSuccess(true)
-
-    // Clear form
-    setEmail("")
-    setUsername("")
-    setPassword("")
-  }
+  };
 
   return (
     <div className="signup-container">
@@ -65,7 +53,13 @@ const SignUp = ({ onNavigateToLogin }) => {
       <form onSubmit={handleCreateAccount} className="signup-form">
         <div className="form-group">
           <label htmlFor="new-email">Email:</label>
-          <input type="text" id="new-email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <input
+            type="email"
+            id="new-email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
         </div>
         <div className="form-group">
           <label htmlFor="new-username">Username:</label>
@@ -87,19 +81,26 @@ const SignUp = ({ onNavigateToLogin }) => {
             required
           />
         </div>
-        {message && <div className={isSuccess ? "success-message" : "error-message"}>{message}</div>}
+        {message && (
+          <div className={isSuccess ? "success-message" : "error-message"}>
+            {message}
+          </div>
+        )}
         <div className="button-group">
+          <button
+            type="button"
+            className="next-button"
+            onClick={onNavigateToLogin}
+          >
+            Back
+          </button>
           <button type="submit" className="signup-button">
             Create
-          </button>
-          <button type="button" className="next-button" onClick={onNavigateToLogin}>
-            Back
           </button>
         </div>
       </form>
     </div>
-  )
-}
+  );
+};
 
-export default SignUp
-
+export default SignUp;

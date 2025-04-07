@@ -1,46 +1,39 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import "./Login.css"
+import { useState } from "react";
+import { openConnection } from "./Auth/serverConnection";
+import "./Login.css";
 
 const Login = ({ onLoginSuccess, onNavigateToSignUp }) => {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [error, setError] = useState("")
-  const [accounts, setAccounts] = useState([
-    { email: "admin@test.com", username: "Admin", password: "admin" },
-    { email: "bob@test.com", username: "Bob", password: "bob" },
-  ])
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
 
-  // Load accounts from localStorage on component mount
-  useEffect(() => {
-    const storedAccounts = localStorage.getItem("accounts")
-    if (storedAccounts) {
-      setAccounts(JSON.parse(storedAccounts))
-    }
-  }, [])
-
-  const handleSubmit = (e) => {
-    e.preventDefault()
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
     // Find if email exists
-    const userMatch = accounts.find((cred) => cred.email === email)
+    try {
+      let result = await openConnection.post("/login", {
+        email: email,
+        password: password,
+      });
 
-    if (!userMatch) {
-      setError("Incorrect email!")
-      return
+      setError("");
+
+      onLoginSuccess(result.data.email, result.data.username); // Pass email to App.js
+    } catch (error) {
+      console.error("Error logging in:", error);
+
+      if (error.response && error.response.status === 401) {
+        setError("Invalid credentials. Please try again.");
+        return;
+      }
+
+      setError("Login failed. Please try again.");
+      return;
     }
-
-    // Check if password matches
-    if (userMatch.password !== password) {
-      setError("Incorrect password!")
-      return
-    }
-
-    // Login successful
-    setError("")
-    onLoginSuccess(email, userMatch.username) // Pass both email and username to App.js
-  }
+  };
 
   return (
     <div className="login-container">
@@ -48,7 +41,13 @@ const Login = ({ onLoginSuccess, onNavigateToSignUp }) => {
       <form onSubmit={handleSubmit} className="login-form">
         <div className="form-group">
           <label htmlFor="email">Email:</label>
-          <input type="text" id="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <input
+            type="email"
+            id="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
         </div>
         <div className="form-group">
           <label htmlFor="password">Password:</label>
@@ -69,8 +68,7 @@ const Login = ({ onLoginSuccess, onNavigateToSignUp }) => {
         </div>
       </form>
     </div>
-  )
-}
+  );
+};
 
-export default Login
-
+export default Login;

@@ -452,13 +452,6 @@ int main()
     board_collection = db["board"];
     user_collection = db["users"];
 
-    User admin("admin@test.com", "admin");
-    User bob("bob@test.com", "bob");
-
-    vector<User> users;
-    users.push_back(admin);
-    users.push_back(bob);
-
     httplib::Server svr;
 
     svr.Get("/", [](const httplib::Request &, httplib::Response &res)
@@ -796,8 +789,6 @@ int main()
 
     svr.Post("/login", [&](const httplib::Request &req, httplib::Response &res)
              {
-        
-
             string email;
             string password;
             
@@ -810,20 +801,10 @@ int main()
                 if (req_json.contains("password")&& req_json["password"].is_string()) {
                     password = req_json["password"];
                 }
-                //cout<<email<<password<<endl;
-                // for (const auto &entry : users){
-                //     if (entry.email ==email && entry.password==password){
-                //         res.status=200;
-                //         res.set_content(email+" logged in!", "text/plain");
-                //         return;
-                        
-                //     }
-                // }
     
                 bsoncxx::builder::stream::document filter_builder;
                 filter_builder << "email" << email;
-                filter_builder << "password" << password;
-    
+                filter_builder << "password" << password; 
             
                 // Execute the query
                 mongocxx::cursor cursor = user_collection.find(filter_builder.view());
@@ -837,13 +818,10 @@ int main()
                     }
                     
                 }else{ //entry not found
-                    cout<<"email not found"<<endl;
-                    res.set_content("Email not found", "text/plain");
-                    res.status=404;
+                    cout<<"Invalid Credentials"<<endl;
+                    res.set_content("Invalid Credentials", "text/plain");
+                    res.status=401;
                 }
-    
-                // res.set_content("Incorrect Email or Password", "text/plain");
-                // res.status=401;
     
                 
             } catch (const json::parse_error& e) {
@@ -931,8 +909,6 @@ int main()
                 password = req_json["password"];
             }
 
-            cout << email << username << password << endl;
-
             // Check if all components have been filled up (Fix this...)
             if (email.empty() || username.empty() || password.empty())
             {
@@ -941,21 +917,35 @@ int main()
                 return;
             }
 
-            // Check if the email already exists in the users list
-            for (const auto &entry : users)
+            // Check if the email already exists in the database
+            bsoncxx::builder::stream::document filter_builder;
+            filter_builder << "email" << email;
+            mongocxx::cursor cursor = user_collection.find(filter_builder.view());
+            if (cursor.begin() != cursor.end())
             {
-                if (entry.email == email)
-                {
-                    // If the email already exists, return a message that account already exists
-                    res.status = 409; // Conflict status code
-                    res.set_content(email + " account already exists!", "text/plain");
-                    return;
-                }
+                res.status = 409; // Bad request status code
+                res.set_content("Email already exists!", "text/plain");
+                return;
             }
+            
+            // Insert the new user into the database
+            bsoncxx::builder::stream::document document{};
+            document << "email" << email
+                     << "username" << username
+                     << "password" << password;
+            user_collection.insert_one(document.view());
 
-            // If the email doesn't exist, create a new user
-            // User new_user(email, username, password);
-            // users.push_back(new_user);
+            // Check if the insertion was successful
+            auto result = user_collection.find_one(filter_builder.view());
+            if (!result)
+            {
+                res.status = 500; // Internal server error status code
+                res.set_content("Failed to create account!", "text/plain");
+                return;
+            }
+            // If the insertion was successful, you can return a success message or redirect the user
+            // to a different page.
+
 
             // Return success message...
             res.status = 201; // Created status code
