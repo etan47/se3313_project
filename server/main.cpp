@@ -70,6 +70,7 @@ string boardToString(vector<vector<int>> board)
 #include <random>
 #include <sys/wait.h>
 #include <memory>
+#include <chrono>
 
 int generateRandomID()
 {
@@ -210,8 +211,9 @@ void start_child_process(int session_id)
         string *db_id_ptr = new string(db_id);        // Create a pointer to the db id
         pthread_create(&updateDBThread, NULL, loopUpdateDB, (void *)db_id_ptr);
 
-        // const int TIMEOUT_SECONDS = 300; // 5 minutes timeout
-        const int TIMEOUT_SECONDS = 60; //! # seconds timeout for testing
+        const int TIMEOUT_SECONDS = 300;                                     // 5 minutes timeout
+        const auto TIMEOUT_DURATION = std::chrono::seconds(TIMEOUT_SECONDS); // Use your TIMEOUT_SECONDS value
+        auto last_relevant_activity_time = std::chrono::steady_clock::now();
 
         while (true)
         { // not working because of frontend fetching canvas data every second
@@ -219,9 +221,21 @@ void start_child_process(int session_id)
             FD_ZERO(&read_fds);
             FD_SET(server_fd, &read_fds);
 
+            auto now = std::chrono::steady_clock::now();
+            auto deadline = last_relevant_activity_time + TIMEOUT_DURATION;
+            auto time_remaining = deadline - now;
+
             struct timeval timeout;
-            timeout.tv_sec = TIMEOUT_SECONDS;
-            timeout.tv_usec = 0;
+            if (time_remaining <= std::chrono::seconds(0))
+            {
+                timeout.tv_sec = 0;
+                timeout.tv_usec = 0;
+            }
+            else
+            {
+                timeout.tv_sec = std::chrono::duration_cast<std::chrono::seconds>(time_remaining).count();
+                timeout.tv_usec = std::chrono::duration_cast<std::chrono::microseconds>(time_remaining % std::chrono::seconds(1)).count();
+            }
 
             int activity = select(server_fd + 1, &read_fds, nullptr, nullptr, &timeout);
             if (activity < 0)
@@ -232,6 +246,7 @@ void start_child_process(int session_id)
             else if (activity == 0)
             {
                 cout << "Timeout occurred. No data after " << TIMEOUT_SECONDS << " seconds." << endl;
+
                 pthread_cancel(getBufferThread);
                 pthread_cancel(updateDBThread);
 
@@ -273,6 +288,11 @@ void start_child_process(int session_id)
             json received_json = json::parse(full_request);
 
             int function = received_json["function"];
+
+            if (function != 1)
+            {
+                last_relevant_activity_time = std::chrono::steady_clock::now();
+            }
 
             string response;
 
