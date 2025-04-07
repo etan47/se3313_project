@@ -1,11 +1,5 @@
 // src/Whiteboard.js
-import React, {
-  useRef,
-  useState,
-  useEffect,
-  useCallback,
-  useContext,
-} from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import { useAuth } from "./Auth/AuthProvider";
 import { colourHexInt, convertIntToRGBA, convertHextoRGBA } from "./utils";
 import { openConnection } from "./Auth/serverConnection";
@@ -24,6 +18,21 @@ const Whiteboard = () => {
   const previousPixelsTimeout = useRef(null);
   const [sessionId, setSessionId] = useState(null); // State to store session ID
   const [loading, setLoading] = useState(false); // State to manage loading state
+  const [whiteboards, setWhiteboards] = useState([]); // State to manage whiteboards
+  const [canvasLoading, setCanvasLoading] = useState(true); // State to manage canvas loaded state
+  const [fetchErrors, setFetchErrors] = useState(0); // State to manage fetch errors
+
+  useEffect(() => {
+    setCanvasLoading(true); // Set canvas loaded state to true when component mounts
+    openConnection
+      .get("/getWhiteboards?email=" + email) // Fetch whiteboards for the logged-in user
+      .then((response) => {
+        setWhiteboards(response.data.whiteboards.reverse()); // Set the whiteboards state with the response data
+      })
+      .catch((error) => {
+        console.error("Error fetching whiteboards:", error);
+      });
+  }, [sessionId, email]); // Effect to run when sessionId changes
 
   const fetchUpdatedCanvas = useCallback(() => {
     if (!sessionId) return; // Ensure sessionId is available before making the request
@@ -38,11 +47,22 @@ const Whiteboard = () => {
           }
         }
         drawPixels(pixels);
+        setCanvasLoading(false); // Set canvas loaded state to true after fetching data
+        setFetchErrors(0); // Reset fetch errors count
       })
       .catch((error) => {
         console.error("Error fetching canvas data:", error);
+        setFetchErrors((prev) => prev + 1); // Increment fetch errors count
       });
-  }, [sessionId]);
+  }, [sessionId]); // Effect to run when sessionId or fetchErrors changes
+
+  useEffect(() => {
+    if (fetchErrors >= 5) {
+      setFetchErrors(0); // Reset fetch errors count
+      setSessionId(null); // Reset session ID if fetch errors exceed limit
+      alert("Session expired. Please reopen from saved whiteboards.");
+    }
+  }, [fetchErrors]); // Effect to run when fetchUpdatedCanvas changes
 
   // Setup canvas when component mounts
   useEffect(() => {
@@ -150,6 +170,11 @@ const Whiteboard = () => {
         .post("/drawLine?session_id=" + sessionId, toSend)
         .then((response) => {
           console.log("Canvas updated:", response.data);
+        })
+        .catch((error) => {
+          console.error("Error updating canvas:", error);
+          setSessionId(null); // Reset session ID on error
+          alert("Session expired. Please reopen from saved whiteboards.");
         });
     }
 
@@ -282,6 +307,39 @@ const Whiteboard = () => {
       });
   }
 
+  function loadWhiteboard(whiteboard) {
+    setLoading(true); // Set loading state to true
+    openConnection
+      .post("/loadWhiteboard?db_id=" + whiteboard)
+      .then((response) => {
+        console.log(response);
+        if (response.status === 200) {
+          console.log("Whiteboard loaded successfully:", response.data);
+          const sessionId = response.data.session_id; // Get the session ID from the response
+          setSessionId(sessionId); // Set the session ID state
+          setLoading(false); // Reset loading state
+        } else {
+          console.error("Error loading whiteboard:", response.data.message);
+          setSessionId(null); // Reset session ID on error
+          setLoading(false); // Reset loading state
+        }
+      })
+      .catch((error) => {
+        console.error("Error loading whiteboard:", error);
+        setSessionId(null); // Reset session ID on error
+        setLoading(false); // Reset loading state
+      });
+  }
+
+  if (loading) {
+    return (
+      <div>
+        <h2>Loading...</h2>
+        <p>Please wait while we set up your whiteboard.</p>
+      </div>
+    );
+  }
+
   if (!sessionId) {
     return (
       <div>
@@ -294,15 +352,20 @@ const Whiteboard = () => {
           placeholder="Enter session ID"
         />
         <button onClick={joinSession}>Join</button>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div>
-        <h2>Loading...</h2>
-        <p>Please wait while we set up your whiteboard.</p>
+        {whiteboards.length > 0 && (
+          <>
+            <p>Saved Whiteboards:</p>
+            <ul>
+              {whiteboards.map((whiteboard) => (
+                <li key={whiteboard}>
+                  <button onClick={() => loadWhiteboard(whiteboard)}>
+                    {whiteboard}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
       </div>
     );
   }
@@ -312,14 +375,29 @@ const Whiteboard = () => {
       <button onClick={() => setSessionId(null)}>Back</button>
       <h1>Whiteboard Canvas</h1>
       <p>Session ID: {sessionId}</p>
-      <canvas
-        onMouseDown={startDrawing}
-        onMouseMove={draw}
-        onMouseUp={finishDrawing}
-        onMouseOut={finishDrawing}
-        ref={canvasRef}
-        style={{ border: "1px solid #000" }}
-      />
+
+      <div style={{ position: "relative" }}>
+        <canvas
+          onMouseDown={startDrawing}
+          onMouseMove={draw}
+          onMouseUp={finishDrawing}
+          onMouseOut={finishDrawing}
+          ref={canvasRef}
+          style={{ border: "1px solid #000" }}
+        />
+        {canvasLoading && (
+          <h2
+            style={{
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+            }}
+          >
+            Loading...
+          </h2>
+        )}
+      </div>
       <br />
       <p>Set Colour:</p>
       <button onClick={changeColour}>Black</button>
@@ -330,14 +408,18 @@ const Whiteboard = () => {
       <button onClick={changeColour}>Blue</button>
       <button onClick={changeColour}>Purple</button>
       <button onClick={changeColour}>White</button>
-      <button onClick={clearCanvas}>Clear</button>
       <br />
       <p>Set Thickness:</p>
-      <button onClick={changeThickness}>1</button>
-      <button onClick={changeThickness}>4</button>
-      <button onClick={changeThickness}>10</button>
-      <button onClick={changeThickness}>20</button>
-      <button onClick={changeThickness}>60</button>
+      <input
+        type="range"
+        min="1"
+        max="81"
+        step={5}
+        value={thickness}
+        onChange={(e) => setThickness(e.target.value)}
+      />
+      <br />
+      <button onClick={clearCanvas}>Clear Canvas</button>
     </div>
   );
 };

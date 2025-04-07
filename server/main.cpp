@@ -211,7 +211,7 @@ void start_child_process(int session_id)
         string *db_id_ptr = new string(db_id);        // Create a pointer to the db id
         pthread_create(&updateDBThread, NULL, loopUpdateDB, (void *)db_id_ptr);
 
-        const int TIMEOUT_SECONDS = 300;                                     // 5 minutes timeout
+        const int TIMEOUT_SECONDS = 20;                                      // 5 minutes timeout
         const auto TIMEOUT_DURATION = std::chrono::seconds(TIMEOUT_SECONDS); // Use your TIMEOUT_SECONDS value
         auto last_relevant_activity_time = std::chrono::steady_clock::now();
 
@@ -667,6 +667,58 @@ int main()
         res.status = 200; // Bad request status code
                 res.set_content("Whiteboard Joined!", "text/plain");
                 return; });
+
+    svr.Get("/getWhiteboards", [&](const httplib::Request &req, httplib::Response &res)
+            {
+        if (!req.has_param("email"))
+        {
+            res.status = 400;
+            res.set_content("Missing email", "text/plain");
+            return;
+        }
+
+        string email = req.get_param_value("email");
+
+        try {
+            auto filter = bsoncxx::builder::stream::document{} << "email" << email << bsoncxx::builder::stream::finalize; // filter by email
+            auto result = user_collection.find_one(filter.view());
+
+            if (result) {
+                auto doc_view = result->view();
+                auto whiteboards_element = doc_view["whiteboards"];
+            
+                if (whiteboards_element && whiteboards_element.type() == bsoncxx::type::k_array) {
+                    auto whiteboards_array = whiteboards_element.get_array().value;
+
+                    json whiteboards_json = json::parse(bsoncxx::to_json(whiteboards_array));
+                    json response_json = json::object();
+                    response_json["whiteboards"] = whiteboards_json;
+                    
+                    res.set_header("Content-Type", "application/json");
+                    res.set_content(response_json.dump(), "application/json"); // Set the response content to the JSON string
+                    return;
+
+                } else {
+                    std::cout << "No whiteboards array found." << std::endl;
+                }
+            } else {
+                std::cout << "User not found." << std::endl;
+            }
+
+            res.status = 500; 
+            res.set_content("Server Error!", "text/plain");
+            return;
+
+        } catch (const mongocxx::exception& e) {
+            cerr << "MongoDB Exception: " << e.what() << endl;
+        } catch (const exception& e) {
+            cerr << "Standard Exception: " << e.what() << endl;
+        } catch (...) {
+            cerr << "Unknown error occurred during insertion." << endl;
+        }
+
+        res.status = 500; // Internal server error status code
+        res.set_content("Server Error!", "text/plain"); });
 
     svr.Get("/getBoard", [](const httplib::Request &req, httplib::Response &res)
             {

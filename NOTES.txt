@@ -1,5 +1,3 @@
 Need to handle frontend and backend input validation
 
 Need to check concurrent user capabilities
-
-Need to implement whiteboard history for users
