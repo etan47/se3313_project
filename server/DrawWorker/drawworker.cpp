@@ -5,7 +5,17 @@
 
 using namespace std;
 
-DrawWorker::DrawWorker(PixelBuffer *pb, nlohmann::json req_json) : pixelBuffer(pb), req_json(req_json) {}
+DrawWorker::DrawWorker(PixelBuffer *pb, nlohmann::json req_json) : pixelBuffer(pb)
+{
+    // make a copy of the json object
+    this->req_json = req_json;
+    this->start(); // Start the thread immediately
+}
+
+DrawWorker::~DrawWorker()
+{
+    join();
+}
 
 void DrawWorker::run()
 {
@@ -28,5 +38,12 @@ void DrawWorker::run()
 void DrawWorker::start()
 {
     workerThread = thread(&DrawWorker::run, this);
-    workerThread.detach();
+}
+
+void DrawWorker::join()
+{
+    if (workerThread.joinable())
+    {
+        workerThread.join();
+    }
 }

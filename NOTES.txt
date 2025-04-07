@@ -1,9 +1,8 @@
 Need to handle process shutdowns (no users active / timeout)
+    - Current problem is constant whiteboard fetches from frontend are seen as activity
 
 Need to handle frontend and backend input validation
 
 Need to check concurrent user capabilities
 
 Need to implement whiteboard history for users
-
-Need to implement starting a whiteboard from history

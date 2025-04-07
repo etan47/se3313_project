@@ -7,9 +7,10 @@
 #include <thread>
 #include "../nlohmann/json.hpp"
 
-class DrawWorker {
+class DrawWorker
+{
 private:
-    PixelBuffer* pixelBuffer;
+    PixelBuffer *pixelBuffer;
     nlohmann::json req_json;
     std::vector<Pixel> pixels;
     std::thread workerThread;
@@ -17,8 +18,10 @@ private:
     void run();
 
 public:
-    DrawWorker(PixelBuffer* pb, nlohmann::json req_json);
+    DrawWorker(PixelBuffer *pb, nlohmann::json req_json);
+    ~DrawWorker();
     void start();
+    void join();
 };
 
 #endif // DRAWWORKER_H
