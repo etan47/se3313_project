@@ -1,9 +1,17 @@
 // src/Whiteboard.js
-import React, { useRef, useState, useEffect, useCallback, use } from "react";
+import React, {
+  useRef,
+  useState,
+  useEffect,
+  useCallback,
+  useContext,
+} from "react";
+import { useAuth } from "./Auth/AuthProvider";
 import { colourHexInt, convertIntToRGBA, convertHextoRGBA } from "./utils";
 import { openConnection } from "./Auth/serverConnection";
 
 const Whiteboard = () => {
+  const { email } = useAuth(); // Get email from AuthProvider
   const cWidth = 900;
   const cHeight = 600;
   const canvasRef = useRef(null);
@@ -16,9 +24,6 @@ const Whiteboard = () => {
   const previousPixelsTimeout = useRef(null);
   const [sessionId, setSessionId] = useState(null); // State to store session ID
   const [loading, setLoading] = useState(false); // State to manage loading state
-
-  //TODO: create a session
-  //TODO: load the session (set session_id state, append to urls)
 
   const fetchUpdatedCanvas = useCallback(() => {
     if (!sessionId) return; // Ensure sessionId is available before making the request
@@ -228,8 +233,13 @@ const Whiteboard = () => {
 
   function createSession() {
     setLoading(true); // Set loading state to true
+
+    let postBody = {
+      email: email,
+    };
+
     openConnection
-      .post("/startWhiteboard")
+      .post("/startWhiteboard", postBody) // Send request to create a new session
       .then((response) => {
         setSessionId(response.data.session_id); // Set the session ID from the response
         setLoading(false); // Reset loading state
@@ -247,8 +257,29 @@ const Whiteboard = () => {
       'input[name="sessionIdInput"]'
     ); // Get the input field for session ID
     const sessionIdValue = sessionIdInput.value.trim(); // Get the session ID from the input field
-    setSessionId(sessionIdValue); // Set the session ID state
-    setLoading(false); // Reset loading state
+
+    openConnection
+      .post("/joinWhiteboard", {
+        session_id: sessionIdValue,
+        email: email,
+      })
+      .then((response) => {
+        console.log(response);
+        if (response.status === 200) {
+          console.log("Session joined successfully:", response.data);
+          setSessionId(sessionIdValue); // Set the session ID state
+          setLoading(false); // Reset loading state
+        } else {
+          console.error("Error joining session:", response.data.message);
+          setSessionId(null); // Reset session ID on error
+          setLoading(false); // Reset loading state
+        }
+      })
+      .catch((error) => {
+        console.error("Error joining session:", error);
+        setSessionId(null); // Reset session ID on error
+        setLoading(false); // Reset loading state
+      });
   }
 
   if (!sessionId) {
@@ -278,6 +309,7 @@ const Whiteboard = () => {
 
   return (
     <div>
+      <button onClick={() => setSessionId(null)}>Back</button>
       <h1>Whiteboard Canvas</h1>
       <p>Session ID: {sessionId}</p>
       <canvas

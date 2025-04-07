@@ -544,8 +544,13 @@ int main()
                  res.set_header("Content-Type", "application/json");
                  res.set_content(response, "application/json"); });
 
-    svr.Post("/startWhiteboard", [&](const httplib::Request &, httplib::Response &res)
+    svr.Post("/startWhiteboard", [&](const httplib::Request &req, httplib::Response &res)
              {
+
+                json req_json = json::parse(req.body);
+                string email = req_json["email"];
+                // cout << "Email: " << email << endl;
+
         vector<vector<int>> board = getBoard();
 
         // Convert matrix to BSON
@@ -588,6 +593,29 @@ int main()
             cerr << "Unknown error occurred during insertion." << endl;
         }
 
+        try {
+            cout << "Attempting to update user in MongoDB..." << endl;
+
+            auto filter = bsoncxx::builder::stream::document{} << "email" << email << bsoncxx::builder::stream::finalize; // filter by email
+
+            auto update = bsoncxx::builder::stream::document{} << "$addToSet" << bsoncxx::builder::stream::open_document
+                << "whiteboards" << whiteboardID // add the whiteboard id to the user collection
+                << bsoncxx::builder::stream::close_document << bsoncxx::builder::stream::finalize;
+        
+            auto result = user_collection.update_one(filter.view(), update.view());
+        
+            if (result) {
+                cout << "User updated successfully." << endl;
+            } else {
+                cerr << "Update failed: No document was updated." << endl;
+            }
+        } catch (const mongocxx::exception& e) {
+            cerr << "MongoDB Exception: " << e.what() << endl;
+        } catch (const exception& e) {
+            cerr << "Standard Exception: " << e.what() << endl;
+        } catch (...) {
+            cerr << "Unknown error occurred during insertion." << endl;
+        }
 
         int session_id = generateRandomID();
         while (db_se_map.containsSeID(session_id))
@@ -603,6 +631,42 @@ int main()
             res.status = 200;
             res.set_header("Content-Type", "application/json");
             res.set_content(response, "application/json"); });
+
+    svr.Post("/joinWhiteboard", [&](const httplib::Request &req, httplib::Response &res)
+             {
+        json req_json = json::parse(req.body);
+        string email = req_json["email"];
+        string session_id = req_json["session_id"];
+
+        string whiteboardID = db_se_map.getDbID(stoi(session_id)); // Get the db id from the session id
+
+        try {
+            cout << "Attempting to update user in MongoDB..." << endl;
+
+            auto filter = bsoncxx::builder::stream::document{} << "email" << email << bsoncxx::builder::stream::finalize; // filter by email
+
+            auto update = bsoncxx::builder::stream::document{} << "$addToSet" << bsoncxx::builder::stream::open_document
+                << "whiteboards" << whiteboardID // add the whiteboard id to the user collection
+                << bsoncxx::builder::stream::close_document << bsoncxx::builder::stream::finalize;
+        
+            auto result = user_collection.update_one(filter.view(), update.view());
+        
+            if (result) {
+                cout << "User updated successfully." << endl;
+            } else {
+                cerr << "Update failed: No document was updated." << endl;
+            }
+        } catch (const mongocxx::exception& e) {
+            cerr << "MongoDB Exception: " << e.what() << endl;
+        } catch (const exception& e) {
+            cerr << "Standard Exception: " << e.what() << endl;
+        } catch (...) {
+            cerr << "Unknown error occurred during insertion." << endl;
+        }
+
+        res.status = 200; // Bad request status code
+                res.set_content("Whiteboard Joined!", "text/plain");
+                return; });
 
     svr.Get("/getBoard", [](const httplib::Request &req, httplib::Response &res)
             {
@@ -932,7 +996,8 @@ int main()
             bsoncxx::builder::stream::document document{};
             document << "email" << email
                      << "username" << username
-                     << "password" << password;
+                     << "password" << password
+                     << "whiteboards" << bsoncxx::builder::stream::array{}; // Initialize an empty array for whiteboards
             user_collection.insert_one(document.view());
 
             // Check if the insertion was successful
