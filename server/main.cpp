@@ -489,7 +489,7 @@ int main()
                  start_child_process(session_id);
 
                  {
-                 this_thread::sleep_for(chrono::milliseconds(2400)); // Wait for the child process to start
+                 this_thread::sleep_for(chrono::milliseconds(3000)); // Wait for the child process to start
                  
                 string target_socket = SOCKET_PATH_PREFIX + to_string(session_id);
 

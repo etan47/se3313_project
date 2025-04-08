@@ -57,7 +57,7 @@ const Whiteboard = () => {
   }, [sessionId]); // Effect to run when sessionId or fetchErrors changes
 
   useEffect(() => {
-    if (fetchErrors >= 5) {
+    if (fetchErrors >= 20) {
       setFetchErrors(0); // Reset fetch errors count
       setSessionId(null); // Reset session ID if fetch errors exceed limit
       alert("Session expired. Please reopen from saved whiteboards.");
@@ -184,14 +184,14 @@ const Whiteboard = () => {
       ...previousPixels.current,
     ]);
 
-    // Set a timeout to clear the previousPixels after 500ms
+    // Set a timeout to clear the previousPixels after 1000ms
     if (previousPixelsTimeout.current) {
       clearTimeout(previousPixelsTimeout.current);
     }
     previousPixelsTimeout.current = setTimeout(() => {
       previousPixels.current.clear();
       previousPixelsTimeout.current = null;
-    }, 800);
+    }, 1000);
 
     finalPixels.current = new Set();
     contextRef.current.closePath();
