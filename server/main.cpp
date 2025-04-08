@@ -211,7 +211,7 @@ void start_child_process(int session_id)
         string *db_id_ptr = new string(db_id);        // Create a pointer to the db id
         pthread_create(&updateDBThread, NULL, loopUpdateDB, (void *)db_id_ptr);
 
-        const int TIMEOUT_SECONDS = 20;                                      // 5 minutes timeout
+        const int TIMEOUT_SECONDS = 300;                                     // 5 minutes timeout
         const auto TIMEOUT_DURATION = std::chrono::seconds(TIMEOUT_SECONDS); // Use your TIMEOUT_SECONDS value
         auto last_relevant_activity_time = std::chrono::steady_clock::now();
 
