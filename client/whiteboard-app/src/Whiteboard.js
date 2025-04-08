@@ -208,7 +208,7 @@ const Whiteboard = () => {
   };
 
   const changeColour = (e) => {
-    contextRef.current.fillStyle = e.target.textContent;
+    contextRef.current.fillStyle = e.target.style.backgroundColor;
   };
 
   const changeThickness = (e) => {
@@ -370,6 +370,17 @@ const Whiteboard = () => {
     );
   }
 
+  const colorButtons = [
+    { color: "Black", hex: "#000000" },
+    { color: "Red", hex: "#FF0000" },
+    { color: "Orange", hex: "#FFA500" },
+    { color: "Yellow", hex: "#FFFF00" },
+    { color: "Green", hex: "#008000" },
+    { color: "Blue", hex: "#0000FF" },
+    { color: "Purple", hex: "#800080" },
+    { color: "White", hex: "#FFFFFF" },
+  ];
+
   return (
     <div>
       <button onClick={() => setSessionId(null)}>Back</button>
@@ -400,14 +411,21 @@ const Whiteboard = () => {
       </div>
       <br />
       <p>Set Colour:</p>
-      <button onClick={changeColour}>Black</button>
-      <button onClick={changeColour}>Red</button>
-      <button onClick={changeColour}>Orange</button>
-      <button onClick={changeColour}>Yellow</button>
-      <button onClick={changeColour}>Green</button>
-      <button onClick={changeColour}>Blue</button>
-      <button onClick={changeColour}>Purple</button>
-      <button onClick={changeColour}>White</button>
+      {colorButtons.map((btn) => (
+        <button
+          key={btn.color}
+          onClick={changeColour}
+          style={{
+            backgroundColor: btn.hex,
+            color: btn.hex,
+            border: `2px solid black`, // Set border color to match the background color
+            padding: "10px 20px",
+            margin: "5px",
+          }}
+        >
+          {btn.color}
+        </button>
+      ))}
       <br />
       <p>Set Thickness:</p>
       <input
