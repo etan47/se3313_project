@@ -1,10 +1,13 @@
 import { createContext, useContext, useState, useEffect } from "react";
 
 export const AuthContext = createContext(null);
-export const AuthProvider = ({ children }) => {
-  const [email, setEmail] = useState("");
-  const [isLoggedIn, setIsLoggedIn] = useState(false); //! Set to true for testing purposes
 
+// AuthProvider component to manage authentication state
+export const AuthProvider = ({ children }) => {
+  const [email, setEmail] = useState(""); // Initialize email state
+  const [isLoggedIn, setIsLoggedIn] = useState(false); // Initialize login state
+
+  // Effect to check local storage for email on component mount
   useEffect(() => {
     const storedEmail = localStorage.getItem("email");
     if (storedEmail) {
@@ -24,6 +27,7 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
+// Custom hook to use the AuthContext
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {

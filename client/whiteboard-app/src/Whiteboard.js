@@ -22,6 +22,7 @@ const Whiteboard = () => {
   const [canvasLoading, setCanvasLoading] = useState(true); // State to manage canvas loaded state
   const [fetchErrors, setFetchErrors] = useState(0); // State to manage fetch errors
 
+  // Fetch whiteboards when the component mounts or when sessionId changes
   useEffect(() => {
     setCanvasLoading(true); // Set canvas loaded state to true when component mounts
     openConnection
@@ -34,18 +35,25 @@ const Whiteboard = () => {
       });
   }, [sessionId, email]); // Effect to run when sessionId changes
 
+  // Function to get the updated canvas data from the server and draw it on the canvas
   const fetchUpdatedCanvas = useCallback(() => {
     if (!sessionId) return; // Ensure sessionId is available before making the request
+
+    // get the updated canvas data from the server
     openConnection
       .get("/getBoard?session_id=" + sessionId) // Use the session ID in the URL
       .then((response) => {
         console.log("Canvas data fetched");
+
+        // convert the response data to RGBA format
         let pixels = [];
         for (let i = 0; i < response.data.length; i++) {
           for (let j = 0; j < response.data[i].length; j++) {
             pixels.push(convertIntToRGBA(response.data[i][j]));
           }
         }
+
+        // draw the pixels on the canvas
         drawPixels(pixels);
         setCanvasLoading(false); // Set canvas loaded state to true after fetching data
         setFetchErrors(0); // Reset fetch errors count
@@ -56,6 +64,7 @@ const Whiteboard = () => {
       });
   }, [sessionId]); // Effect to run when sessionId or fetchErrors changes
 
+  // Effect to handle session expiration
   useEffect(() => {
     if (fetchErrors >= 20) {
       setFetchErrors(0); // Reset fetch errors count
@@ -73,17 +82,17 @@ const Whiteboard = () => {
     canvas.height = cHeight;
     canvas.style.width = `${cWidth}px`;
     canvas.style.height = `${cHeight}px`;
-
     const context = canvas.getContext("2d");
     context.scale(1, 1);
     context.fillStyle = "Black";
     contextRef.current = context;
 
+    // set up an interval to fetch updated canvas data every 3 seconds
     const intervalId = setInterval(() => {
       fetchUpdatedCanvas();
-    }, 2000);
+    }, 4000);
 
-    return () => clearInterval(intervalId);
+    return () => clearInterval(intervalId); // Cleanup interval on unmount
   }, [fetchUpdatedCanvas, sessionId]);
 
   // Start drawing on mouse down
@@ -173,8 +182,6 @@ const Whiteboard = () => {
         })
         .catch((error) => {
           console.error("Error updating canvas:", error);
-          setSessionId(null); // Reset session ID on error
-          alert("Session expired. Please reopen from saved whiteboards.");
         });
     }
 
@@ -184,21 +191,23 @@ const Whiteboard = () => {
       ...previousPixels.current,
     ]);
 
-    // Set a timeout to clear the previousPixels after 1000ms
+    // clear the previousPixelTimeout
     if (previousPixelsTimeout.current) {
       clearTimeout(previousPixelsTimeout.current);
     }
+
+    // set a timeout to clear the previousPixels after 500ms
     previousPixelsTimeout.current = setTimeout(() => {
       previousPixels.current.clear();
       previousPixelsTimeout.current = null;
-    }, 1000);
+    }, 500);
 
-    finalPixels.current = new Set();
-    contextRef.current.closePath();
-    setIsDrawing(false);
+    finalPixels.current = new Set(); // Clear the finalPixels set
+    contextRef.current.closePath(); // Close the path in the context
+    setIsDrawing(false); // Set isDrawing to false
   };
 
-  // Clear the canvas (optional)
+  // Clear the canvas
   const clearCanvas = () => {
     const canvas = canvasRef.current;
     contextRef.current.clearRect(0, 0, canvas.width, canvas.height);
@@ -211,21 +220,19 @@ const Whiteboard = () => {
     contextRef.current.fillStyle = e.target.style.backgroundColor;
   };
 
-  const changeThickness = (e) => {
-    setThickness(e.target.textContent);
-  };
-
+  // Function to draw pixels on the canvas
   function drawPixels(pixels) {
-    const ctx = canvasRef.current.getContext("2d");
+    const ctx = canvasRef.current.getContext("2d"); // Get the canvas context
     const imageData = ctx.getImageData(0, 0, cWidth, cHeight); // Read current data
-    const data = imageData.data;
+    const data = imageData.data; // Get the pixel data array
 
+    // Check if the pixel array length matches the canvas dimensions
     if (pixels.length !== cWidth * cHeight) {
       console.error("Pixel array length does not match canvas dimensions.");
       return;
     }
 
-    // Update pixels received from server
+    // Update pixels with the fetched canvas data
     for (let i = 0; i < pixels.length; i++) {
       const pixel = pixels[i];
       const dataIndex = i * 4;
@@ -235,27 +242,29 @@ const Whiteboard = () => {
       data[dataIndex + 3] = pixel.a;
     }
 
-    // Update pixels drawn by the user
+    // Create a set of local pixels drawn by the user
     const pixelsToDraw = new Set([
       ...finalPixels.current,
       ...previousPixels.current,
     ]);
 
+    // Draw local pixels on the canvas over the fetched pixels for smoothness
     pixelsToDraw.forEach((pixelKey) => {
       const [x, y] = pixelKey.split(",").map(Number);
       if (x >= 0 && x < cWidth && y >= 0 && y < cHeight) {
         const colour = convertHextoRGBA(contextRef.current.fillStyle);
         const dataIndex = (y * cWidth + x) * 4;
-        data[dataIndex] = colour.r; // Set to user's color. for example black.
+        data[dataIndex] = colour.r; // Set to user's color
         data[dataIndex + 1] = colour.g;
         data[dataIndex + 2] = colour.b;
         data[dataIndex + 3] = colour.a;
       }
     });
 
-    ctx.putImageData(imageData, 0, 0);
+    ctx.putImageData(imageData, 0, 0); // Update the canvas with the new pixel data
   }
 
+  // Function to create a new session
   function createSession() {
     setLoading(true); // Set loading state to true
 
@@ -276,13 +285,17 @@ const Whiteboard = () => {
       });
   }
 
+  // Function to join an existing session
   function joinSession() {
     setLoading(true); // Set loading state to true
+
     const sessionIdInput = document.querySelector(
       'input[name="sessionIdInput"]'
     ); // Get the input field for session ID
+
     const sessionIdValue = sessionIdInput.value.trim(); // Get the session ID from the input field
 
+    // send request to join the session
     openConnection
       .post("/joinWhiteboard", {
         session_id: sessionIdValue,
@@ -290,6 +303,8 @@ const Whiteboard = () => {
       })
       .then((response) => {
         console.log(response);
+
+        // Check if the response status is 200 (OK)
         if (response.status === 200) {
           console.log("Session joined successfully:", response.data);
           setSessionId(sessionIdValue); // Set the session ID state
@@ -307,12 +322,17 @@ const Whiteboard = () => {
       });
   }
 
+  // Function to load a saved whiteboard
   function loadWhiteboard(whiteboard) {
     setLoading(true); // Set loading state to true
+
+    // send request to load the whiteboard
     openConnection
       .post("/loadWhiteboard?db_id=" + whiteboard)
       .then((response) => {
         console.log(response);
+
+        // Check if the response status is 200 (OK)
         if (response.status === 200) {
           console.log("Whiteboard loaded successfully:", response.data);
           const sessionId = response.data.session_id; // Get the session ID from the response
@@ -331,6 +351,7 @@ const Whiteboard = () => {
       });
   }
 
+  // If loading, show a loading message
   if (loading) {
     return (
       <div>
@@ -340,6 +361,7 @@ const Whiteboard = () => {
     );
   }
 
+  // If no session ID, show the create/join session options
   if (!sessionId) {
     return (
       <div>
@@ -381,6 +403,7 @@ const Whiteboard = () => {
     { color: "White", hex: "#FFFFFF" },
   ];
 
+  // Render the whiteboard canvas and controls
   return (
     <div>
       <button onClick={() => setSessionId(null)}>Back</button>
@@ -423,7 +446,7 @@ const Whiteboard = () => {
             margin: "5px",
           }}
         >
-          {btn.color}
+          square
         </button>
       ))}
       <br />

@@ -10,8 +10,6 @@ import NavBar from "./NavBar";
 
 function App() {
   const { email, setEmail, isLoggedIn, setIsLoggedIn } = useAuth();
-  // const [isLoggedIn, setIsLoggedIn] = useState(false); //! Set to true for testing purposes
-  // const [email, setEmail] = useState("");
   const [showSignUp, setShowSignUp] = useState(false);
 
   const handleLoginSuccess = (loggedInEmail) => {

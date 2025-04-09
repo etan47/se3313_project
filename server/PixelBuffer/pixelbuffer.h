@@ -9,8 +9,7 @@
 class PixelBuffer
 {
 private:
-    // const int BUFFER_SIZE = 600 * 900; // 540000
-    const int BUFFER_SIZE = 1000 * 1000; // 540000
+    const int BUFFER_SIZE = 1000 * 1000;
 
     std::vector<Pixel> buffer;
     int head, tail, count;

@@ -5,20 +5,23 @@
 
 using namespace std;
 
+// Constructor for DrawWorker
 DrawWorker::DrawWorker(PixelBuffer *pb, nlohmann::json req_json) : pixelBuffer(pb)
 {
-    // make a copy of the json object
-    this->req_json = req_json;
-    this->start(); // Start the thread immediately
+    this->req_json = req_json; // make a copy of the json object
+    this->start();             // Start the thread immediately
 }
 
+// Destructor for DrawWorker
 DrawWorker::~DrawWorker()
 {
-    join();
+    join(); // Wait for the thread to finish before destroying the object
 }
 
+// Function to run in the thread
 void DrawWorker::run()
 {
+    // Extract the pixels from the JSON object
     int colour = req_json["colour"];
     for (auto &item : req_json["pixels"])
     {
@@ -29,17 +32,19 @@ void DrawWorker::run()
 
     if (!pixels.empty())
     {
-        pixelBuffer->writePixels(pixels);
-        cout << "Added " << pixels.size() << " pixels to buffer." << endl;
-        cout << "Colour: " << colour << endl;
+        pixelBuffer->writePixels(pixels); // Write the pixels to the pixel buffer
+        // cout << "Added " << pixels.size() << " pixels to buffer." << endl;
+        // cout << "Colour: " << colour << endl;
     }
 }
 
+// Function to start the thread
 void DrawWorker::start()
 {
     workerThread = thread(&DrawWorker::run, this);
 }
 
+// Function to join the thread
 void DrawWorker::join()
 {
     if (workerThread.joinable())
