@@ -601,26 +601,30 @@ int main()
         // Get the default board
         vector<vector<int>> board = getBoard();
 
-        // Convert matrix to BSON
-        bsoncxx::builder::stream::document document{};
-        bsoncxx::builder::stream::array matrix_array{};
+        bsoncxx::builder::basic::array matrix_array;
 
         for (const auto& row : board) {
-            bsoncxx::builder::stream::array row_array{};
+            bsoncxx::builder::basic::array row_array;
             for (const auto& value : row) {
-                
-                row_array << value;
-               
+                row_array.append(value);
             }
-            matrix_array << row_array;
+            matrix_array.append(row_array);
         }
-
-        document << "matrix" << matrix_array;
+        
+        bsoncxx::builder::basic::document document;
+        document.append(bsoncxx::builder::basic::kvp("matrix", matrix_array));
 
         string whiteboardID;
         //Insert whiteboard into MongoDB
         try {
             cout << "Attempting to insert into MongoDB..." << endl;
+
+            if (!board_collection) {
+                cerr << "MongoDB collection is uninitialized!" << endl;
+                res.status = 500;
+                res.set_content("Server Error!", "text/plain");
+                return;
+            }
         
             auto result = board_collection.insert_one(document.view());
         
