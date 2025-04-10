@@ -1,8 +1,74 @@
 // src/Whiteboard.js
-import React, { useRef, useState, useEffect, useCallback } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { useAuth } from "./Auth/AuthProvider";
 import { colourHexInt, convertIntToRGBA, convertHextoRGBA } from "./utils";
 import { openConnection } from "./Auth/serverConnection";
+
+// Material UI imports
+import { 
+  Box, 
+  Button, 
+  Typography, 
+  TextField, 
+  Slider, 
+  List, 
+  ListItem, 
+  CircularProgress, 
+  AppBar, 
+  Toolbar, 
+  Container, 
+  Paper, 
+  Grid,
+  IconButton
+} from '@mui/material';
+import { styled } from '@mui/material/styles';
+
+// Optional: Import MUI icons if you install @mui/icons-material
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import PaletteIcon from '@mui/icons-material/Palette';
+import DeleteIcon from '@mui/icons-material/Delete';
+
+// Styled components
+const ColorButton = styled(Button)(({ theme, bgcolor }) => ({
+  backgroundColor: bgcolor,
+  minWidth: 40,
+  height: 40,
+  margin: theme.spacing(0.5),
+  border: `2px solid ${theme.palette.grey[300]}`,
+  '&:hover': {
+    backgroundColor: bgcolor,
+    border: `2px solid ${theme.palette.grey[800]}`,
+  },
+}));
+
+const SessionButton = styled(Button)(({ theme }) => ({
+  margin: theme.spacing(1),
+}));
+
+const CanvasContainer = styled(Paper)(({ theme }) => ({
+  position: 'relative',
+  margin: theme.spacing(2, 0),
+  border: `1px solid ${theme.palette.divider}`,
+  borderRadius: theme.shape.borderRadius,
+  overflow: 'hidden',
+}));
+
+const LoadingOverlay = styled(Box)(({ theme }) => ({
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: 'rgba(255, 255, 255, 0.7)',
+  zIndex: 1,
+}));
+
+const WhiteboardCanvas = styled('canvas')({
+  display: 'block',
+});
 
 const Whiteboard = () => {
   const { email } = useAuth(); // Get email from AuthProvider
@@ -21,6 +87,7 @@ const Whiteboard = () => {
   const [whiteboards, setWhiteboards] = useState([]); // State to manage whiteboards
   const [canvasLoading, setCanvasLoading] = useState(true); // State to manage canvas loaded state
   const [fetchErrors, setFetchErrors] = useState(0); // State to manage fetch errors
+  const [sessionIdInput, setSessionIdInput] = useState(''); // State to manage session ID input
 
   // Fetch whiteboards when the component mounts or when sessionId changes
   useEffect(() => {
@@ -216,8 +283,8 @@ const Whiteboard = () => {
     });
   };
 
-  const changeColour = (e) => {
-    contextRef.current.fillStyle = e.target.style.backgroundColor;
+  const changeColour = (color) => {
+    contextRef.current.fillStyle = color;
   };
 
   // Function to draw pixels on the canvas
@@ -289,16 +356,10 @@ const Whiteboard = () => {
   function joinSession() {
     setLoading(true); // Set loading state to true
 
-    const sessionIdInput = document.querySelector(
-      'input[name="sessionIdInput"]'
-    ); // Get the input field for session ID
-
-    const sessionIdValue = sessionIdInput.value.trim(); // Get the session ID from the input field
-
     // send request to join the session
     openConnection
       .post("/joinWhiteboard", {
-        session_id: sessionIdValue,
+        session_id: sessionIdInput,
         email: email,
       })
       .then((response) => {
@@ -307,7 +368,7 @@ const Whiteboard = () => {
         // Check if the response status is 200 (OK)
         if (response.status === 200) {
           console.log("Session joined successfully:", response.data);
-          setSessionId(sessionIdValue); // Set the session ID state
+          setSessionId(sessionIdInput); // Set the session ID state
           setLoading(false); // Reset loading state
         } else {
           console.error("Error joining session:", response.data.message);
@@ -351,47 +412,6 @@ const Whiteboard = () => {
       });
   }
 
-  // If loading, show a loading message
-  if (loading) {
-    return (
-      <div>
-        <h2>Loading...</h2>
-        <p>Please wait while we set up your whiteboard.</p>
-      </div>
-    );
-  }
-
-  // If no session ID, show the create/join session options
-  if (!sessionId) {
-    return (
-      <div>
-        <h2>Please create or join a session to start drawing.</h2>
-        <button onClick={createSession}>Create Session</button>
-        <p>Join Session:</p>
-        <input
-          name="sessionIdInput"
-          type="text"
-          placeholder="Enter session ID"
-        />
-        <button onClick={joinSession}>Join</button>
-        {whiteboards.length > 0 && (
-          <>
-            <p>Saved Whiteboards:</p>
-            <ul>
-              {whiteboards.map((whiteboard) => (
-                <li key={whiteboard}>
-                  <button onClick={() => loadWhiteboard(whiteboard)}>
-                    {whiteboard}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-      </div>
-    );
-  }
-
   const colorButtons = [
     { color: "Black", hex: "#000000" },
     { color: "Red", hex: "#FF0000" },
@@ -403,65 +423,177 @@ const Whiteboard = () => {
     { color: "White", hex: "#FFFFFF" },
   ];
 
-  // Render the whiteboard canvas and controls
-  return (
-    <div>
-      <button onClick={() => setSessionId(null)}>Back</button>
-      <h1>Whiteboard Canvas</h1>
-      <p>Session ID: {sessionId}</p>
+  // If loading, show a loading message with MUI
+  if (loading) {
+    return (
+      <Container maxWidth="md" sx={{ textAlign: 'center', py: 4 }}>
+        <CircularProgress size={60} sx={{ mb: 2 }} />
+        <Typography variant="h5">Loading...</Typography>
+        <Typography variant="body1" color="text.secondary">
+          Please wait while we set up your whiteboard.
+        </Typography>
+      </Container>
+    );
+  }
 
-      <div style={{ position: "relative" }}>
-        <canvas
+  // If no session ID, show the create/join session options with MUI
+  if (!sessionId) {
+    return (
+      <Container maxWidth="md" sx={{ py: 4 }}>
+        <Paper sx={{ p: 3, mb: 3 }}>
+          <Typography variant="h4" gutterBottom align="center">
+            Whiteboard Application
+          </Typography>
+          <Typography variant="h6" gutterBottom align="center">
+            Please create or join a session to start drawing.
+          </Typography>
+          
+          <Box sx={{ textAlign: 'center', mb: 3 }}>
+            <Button 
+              variant="contained" 
+              color="primary" 
+              size="large"
+              onClick={createSession}
+              sx={{ minWidth: 200 }}
+            >
+              Create Session
+            </Button>
+          </Box>
+          
+          <Box sx={{ mb: 3, textAlign: 'center' }}>
+            <Typography variant="subtitle1" gutterBottom>
+              Join Session:
+            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2 }}>
+              <TextField
+                placeholder="Enter session ID"
+                value={sessionIdInput}
+                onChange={(e) => setSessionIdInput(e.target.value)}
+                variant="outlined"
+                sx={{ width: '60%' }}
+              />
+              <Button 
+                variant="contained" 
+                onClick={joinSession}
+                disabled={!sessionIdInput}
+              >
+                Join
+              </Button>
+            </Box>
+          </Box>
+          
+          {whiteboards.length > 0 && (
+            <Box>
+              <Typography variant="subtitle1" gutterBottom>
+                Saved Whiteboards:
+              </Typography>
+              <Paper variant="outlined" sx={{ maxHeight: 300, overflow: 'auto', p: 1 }}>
+                <List dense>
+                  {whiteboards.map((whiteboard) => (
+                    <ListItem key={whiteboard} disablePadding>
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        onClick={() => loadWhiteboard(whiteboard)}
+                        sx={{ justifyContent: 'flex-start', textTransform: 'none', py: 1 }}
+                      >
+                        {whiteboard}
+                      </Button>
+                    </ListItem>
+                  ))}
+                </List>
+              </Paper>
+            </Box>
+          )}
+        </Paper>
+      </Container>
+    );
+  }
+
+  // Render the whiteboard canvas and controls with MUI
+  return (
+    <Container maxWidth="lg">
+      <AppBar position="static" color="default" elevation={0} sx={{ mb: 2 }}>
+        <Toolbar>
+          <Button 
+            color="inherit"
+            onClick={() => setSessionId(null)}
+            sx={{ mr: 2 }}
+          >
+            Back
+          </Button>
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            Whiteboard Canvas
+          </Typography>
+          <Typography variant="body2">
+            Session ID: {sessionId}
+          </Typography>
+        </Toolbar>
+      </AppBar>
+
+      <CanvasContainer>
+        <WhiteboardCanvas
           onMouseDown={startDrawing}
           onMouseMove={draw}
           onMouseUp={finishDrawing}
           onMouseOut={finishDrawing}
           ref={canvasRef}
-          style={{ border: "1px solid #000" }}
         />
         {canvasLoading && (
-          <h2
-            style={{
-              position: "absolute",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-            }}
-          >
-            Loading...
-          </h2>
+          <LoadingOverlay>
+            <CircularProgress />
+          </LoadingOverlay>
         )}
-      </div>
-      <br />
-      <p>Set Colour:</p>
-      {colorButtons.map((btn) => (
-        <button
-          key={btn.color}
-          onClick={changeColour}
-          style={{
-            backgroundColor: btn.hex,
-            color: btn.hex,
-            border: `2px solid black`, // Set border color to match the background color
-            padding: "10px 20px",
-            margin: "5px",
-          }}
-        >
-          square
-        </button>
-      ))}
-      <br />
-      <p>Set Thickness:</p>
-      <input
-        type="range"
-        min="1"
-        max="81"
-        step={5}
-        value={thickness}
-        onChange={(e) => setThickness(e.target.value)}
-      />
-      <br />
-      <button onClick={clearCanvas}>Clear Canvas</button>
-    </div>
+      </CanvasContainer>
+      
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="subtitle1" gutterBottom>
+              Set Colour:
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap' }}>
+              {colorButtons.map((btn) => (
+                <ColorButton
+                  key={btn.color}
+                  onClick={() => changeColour(btn.hex)}
+                  bgcolor={btn.hex}
+                  aria-label={`Color ${btn.color}`}
+                />
+              ))}
+            </Box>
+          </Paper>
+        </Grid>
+        
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="subtitle1" gutterBottom>
+              Set Thickness: {thickness}px
+            </Typography>
+            <Slider
+              min={1}
+              max={81}
+              step={5}
+              value={thickness}
+              onChange={(e, newValue) => setThickness(newValue)}
+              valueLabelDisplay="auto"
+              aria-labelledby="thickness-slider"
+            />
+            
+            <Box sx={{ mt: 2, textAlign: 'center' }}>
+              <Button 
+                variant="contained" 
+                color="primary" 
+                onClick={clearCanvas}
+                sx={{ mt: 1 }}
+              >
+                Clear Canvas
+              </Button>
+            </Box>
+          </Paper>
+        </Grid>
+      </Grid>
+    </Container>
   );
 };
 

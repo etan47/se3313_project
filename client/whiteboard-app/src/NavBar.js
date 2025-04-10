@@ -1,21 +1,28 @@
-"use client"
-import "./NavBar.css"
+// src/NavBar.js
+import React from "react";
+import { AppBar, Toolbar, Typography, Button, Box } from "@mui/material";
 
-const NavBar = ({ email, username, onLogout }) => {
-  // Use username if available, otherwise fall back to email
-  const displayName = username || email
-
+const NavBar = ({ email, onLogout }) => {
   return (
-    <div className="navbar">
-      <div className="navbar-greeting">Hello, {displayName}</div>
-      <div className="navbar-actions">
-        <button className="logout-button" onClick={onLogout}>
+    <AppBar position="static" color="primary" elevation={2}>
+      <Toolbar>
+        <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+          Hello, {email}
+        </Typography>
+        <Button 
+          color="inherit" 
+          variant="outlined" 
+          onClick={onLogout}
+          sx={{ 
+            bgcolor: 'rgba(255, 255, 255, 0.1)', 
+            '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.2)' } 
+          }}
+        >
           Logout
-        </button>
-      </div>
-    </div>
-  )
-}
+        </Button>
+      </Toolbar>
+    </AppBar>
+  );
+};
 
-export default NavBar
-
+export default NavBar;
