@@ -5,28 +5,28 @@ import { colourHexInt, convertIntToRGBA, convertHextoRGBA } from "./utils";
 import { openConnection } from "./Auth/serverConnection";
 
 // Material UI imports
-import { 
-  Box, 
-  Button, 
-  Typography, 
-  TextField, 
-  Slider, 
-  List, 
-  ListItem, 
-  CircularProgress, 
-  AppBar, 
-  Toolbar, 
-  Container, 
-  Paper, 
+import {
+  Box,
+  Button,
+  Typography,
+  TextField,
+  Slider,
+  List,
+  ListItem,
+  CircularProgress,
+  AppBar,
+  Toolbar,
+  Container,
+  Paper,
   Grid,
-  IconButton
-} from '@mui/material';
-import { styled } from '@mui/material/styles';
+  IconButton,
+} from "@mui/material";
+import { styled } from "@mui/material/styles";
 
 // Optional: Import MUI icons if you install @mui/icons-material
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import PaletteIcon from '@mui/icons-material/Palette';
-import DeleteIcon from '@mui/icons-material/Delete';
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import PaletteIcon from "@mui/icons-material/Palette";
+import DeleteIcon from "@mui/icons-material/Delete";
 
 // Styled components
 const ColorButton = styled(Button)(({ theme, bgcolor }) => ({
@@ -35,7 +35,7 @@ const ColorButton = styled(Button)(({ theme, bgcolor }) => ({
   height: 40,
   margin: theme.spacing(0.5),
   border: `2px solid ${theme.palette.grey[300]}`,
-  '&:hover': {
+  "&:hover": {
     backgroundColor: bgcolor,
     border: `2px solid ${theme.palette.grey[800]}`,
   },
@@ -46,28 +46,30 @@ const SessionButton = styled(Button)(({ theme }) => ({
 }));
 
 const CanvasContainer = styled(Paper)(({ theme }) => ({
-  position: 'relative',
+  position: "relative",
   margin: theme.spacing(2, 0),
   border: `1px solid ${theme.palette.divider}`,
   borderRadius: theme.shape.borderRadius,
-  overflow: 'hidden',
+  overflow: "hidden",
+  width: "900px",
+  height: "600px",
 }));
 
 const LoadingOverlay = styled(Box)(({ theme }) => ({
-  position: 'absolute',
+  position: "absolute",
   top: 0,
   left: 0,
   right: 0,
   bottom: 0,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  backgroundColor: 'rgba(255, 255, 255, 0.7)',
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  backgroundColor: "rgba(255, 255, 255, 0.7)",
   zIndex: 1,
 }));
 
-const WhiteboardCanvas = styled('canvas')({
-  display: 'block',
+const WhiteboardCanvas = styled("canvas")({
+  display: "block",
 });
 
 const Whiteboard = () => {
@@ -87,7 +89,7 @@ const Whiteboard = () => {
   const [whiteboards, setWhiteboards] = useState([]); // State to manage whiteboards
   const [canvasLoading, setCanvasLoading] = useState(true); // State to manage canvas loaded state
   const [fetchErrors, setFetchErrors] = useState(0); // State to manage fetch errors
-  const [sessionIdInput, setSessionIdInput] = useState(''); // State to manage session ID input
+  const [sessionIdInput, setSessionIdInput] = useState(""); // State to manage session ID input
 
   // Fetch whiteboards when the component mounts or when sessionId changes
   useEffect(() => {
@@ -426,7 +428,7 @@ const Whiteboard = () => {
   // If loading, show a loading message with MUI
   if (loading) {
     return (
-      <Container maxWidth="md" sx={{ textAlign: 'center', py: 4 }}>
+      <Container maxWidth="md" sx={{ textAlign: "center", py: 4 }}>
         <CircularProgress size={60} sx={{ mb: 2 }} />
         <Typography variant="h5">Loading...</Typography>
         <Typography variant="body1" color="text.secondary">
@@ -447,11 +449,11 @@ const Whiteboard = () => {
           <Typography variant="h6" gutterBottom align="center">
             Please create or join a session to start drawing.
           </Typography>
-          
-          <Box sx={{ textAlign: 'center', mb: 3 }}>
-            <Button 
-              variant="contained" 
-              color="primary" 
+
+          <Box sx={{ textAlign: "center", mb: 3 }}>
+            <Button
+              variant="contained"
+              color="primary"
               size="large"
               onClick={createSession}
               sx={{ minWidth: 200 }}
@@ -459,21 +461,28 @@ const Whiteboard = () => {
               Create Session
             </Button>
           </Box>
-          
-          <Box sx={{ mb: 3, textAlign: 'center' }}>
+
+          <Box sx={{ mb: 3, textAlign: "center" }}>
             <Typography variant="subtitle1" gutterBottom>
               Join Session:
             </Typography>
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2 }}>
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                gap: 2,
+              }}
+            >
               <TextField
                 placeholder="Enter session ID"
                 value={sessionIdInput}
                 onChange={(e) => setSessionIdInput(e.target.value)}
                 variant="outlined"
-                sx={{ width: '60%' }}
+                sx={{ width: "60%" }}
               />
-              <Button 
-                variant="contained" 
+              <Button
+                variant="contained"
                 onClick={joinSession}
                 disabled={!sessionIdInput}
               >
@@ -481,13 +490,16 @@ const Whiteboard = () => {
               </Button>
             </Box>
           </Box>
-          
+
           {whiteboards.length > 0 && (
             <Box>
               <Typography variant="subtitle1" gutterBottom>
                 Saved Whiteboards:
               </Typography>
-              <Paper variant="outlined" sx={{ maxHeight: 300, overflow: 'auto', p: 1 }}>
+              <Paper
+                variant="outlined"
+                sx={{ maxHeight: 300, overflow: "auto", p: 1 }}
+              >
                 <List dense>
                   {whiteboards.map((whiteboard) => (
                     <ListItem key={whiteboard} disablePadding>
@@ -495,7 +507,11 @@ const Whiteboard = () => {
                         fullWidth
                         variant="outlined"
                         onClick={() => loadWhiteboard(whiteboard)}
-                        sx={{ justifyContent: 'flex-start', textTransform: 'none', py: 1 }}
+                        sx={{
+                          justifyContent: "flex-start",
+                          textTransform: "none",
+                          py: 1,
+                        }}
                       >
                         {whiteboard}
                       </Button>
@@ -512,10 +528,18 @@ const Whiteboard = () => {
 
   // Render the whiteboard canvas and controls with MUI
   return (
-    <Container maxWidth="lg">
+    <Container
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        width: "950px",
+      }}
+      maxWidth="lg"
+    >
       <AppBar position="static" color="default" elevation={0} sx={{ mb: 2 }}>
         <Toolbar>
-          <Button 
+          <Button
             color="inherit"
             onClick={() => setSessionId(null)}
             sx={{ mr: 2 }}
@@ -525,9 +549,7 @@ const Whiteboard = () => {
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             Whiteboard Canvas
           </Typography>
-          <Typography variant="body2">
-            Session ID: {sessionId}
-          </Typography>
+          <Typography variant="body2">Session ID: {sessionId}</Typography>
         </Toolbar>
       </AppBar>
 
@@ -545,14 +567,14 @@ const Whiteboard = () => {
           </LoadingOverlay>
         )}
       </CanvasContainer>
-      
+
       <Grid container spacing={3}>
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 2 }}>
             <Typography variant="subtitle1" gutterBottom>
               Set Colour:
             </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap' }}>
+            <Box sx={{ display: "flex", flexWrap: "wrap" }}>
               {colorButtons.map((btn) => (
                 <ColorButton
                   key={btn.color}
@@ -564,7 +586,7 @@ const Whiteboard = () => {
             </Box>
           </Paper>
         </Grid>
-        
+
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 2 }}>
             <Typography variant="subtitle1" gutterBottom>
@@ -579,11 +601,11 @@ const Whiteboard = () => {
               valueLabelDisplay="auto"
               aria-labelledby="thickness-slider"
             />
-            
-            <Box sx={{ mt: 2, textAlign: 'center' }}>
-              <Button 
-                variant="contained" 
-                color="primary" 
+
+            <Box sx={{ mt: 2, textAlign: "center" }}>
+              <Button
+                variant="contained"
+                color="primary"
                 onClick={clearCanvas}
                 sx={{ mt: 1 }}
               >
@@ -592,6 +614,7 @@ const Whiteboard = () => {
             </Box>
           </Paper>
         </Grid>
+        <Grid item xs={12}></Grid>
       </Grid>
     </Container>
   );
